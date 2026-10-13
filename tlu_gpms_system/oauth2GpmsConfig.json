@@ -1,0 +1,19 @@
+{
+  "web": {
+    "client_id": "265842927368-qqrhr9487ul0776bh5j347hkei0n6br3.apps.googleusercontent.com",
+    "project_id": "the-gpms-system",
+
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "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",
+
+    "redirect_uris": [
+      "http://localhost:3000/authenticate"
+    ],
+    "javascript_origins": [
+      "http://localhost:3000"
+    ]
+  }
+}

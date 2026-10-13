@@ -1,0 +1,41 @@
+package com.example.tlu_gpms_system.features.account.entity;
+
+import com.github.f4b6a3.uuid.UuidCreator;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+
+import java.util.UUID;
+
+@Table(name = "student")
+@Entity
+@Getter
+@Setter
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class Student {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long id;
+
+    // publicId dùng để truy xuất thông tin
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    private UUID publicId = UuidCreator.getTimeOrderedEpoch();
+
+    @Column(name = "student_code", nullable = false)
+    String studentCode;
+
+    @Column(name = "batch", nullable = false)
+    String batch; // Khóa
+
+    @Column(name = "className", nullable = false)
+    String className; // Tên lớp
+
+    @Column(name = "status", nullable = false)
+    Boolean status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "major_id")
+    Major major;
+}
