@@ -39,12 +39,12 @@ public class NotificationController {
 //                .build();
 //    }
 
-    @PatchMapping("/notification" )
-    public APIResponse<Void > readNotification() {
-        notificationService.readNotification();
-        return APIResponse.<Void>builder()
-                .code(1000)
-                .message("Đã đọc toàn bộ thông báo")
-                .build();
-    }
+//    @PatchMapping("/notification" )
+//    public APIResponse<Void > readNotification() {
+//        notificationService.readNotification();
+//        return APIResponse.<Void>builder()
+//                .code(1000)
+//                .message("Đã đọc toàn bộ thông báo")
+//                .build();
+//    }
 }

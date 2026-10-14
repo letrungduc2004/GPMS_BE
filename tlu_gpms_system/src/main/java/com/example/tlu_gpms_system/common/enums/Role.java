@@ -5,7 +5,7 @@ public enum Role {
     HEAD_OF_DEPARTMENT,
     SECRETARY, // Thư kí
     CHAIRPERSON, // Chủ tịch
-    COUNCILMEMBER, // Ủy viên
+    COUNCIL_MEMBER, // Ủy viên
     SUPERVISOR, // Hướng dẫn
     EXAMINER, // Phản biện
     COMMENTING_LECTURER, // Nhận xét

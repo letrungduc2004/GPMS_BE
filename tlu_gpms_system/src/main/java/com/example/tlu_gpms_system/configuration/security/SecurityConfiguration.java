@@ -26,9 +26,10 @@ import java.util.List;
 public class SecurityConfiguration {
 
     private final String[] PUBLIC_POST_ENDPOINT = {
-            "/login", "/refresh-token", "/logout", "/notification/**"
+            "/login-postman", "/login", "/refresh-token", "/logout", "/notification/**"
     };
     private final String[] PUBLIC_GET_ENDPOINT = {};
+
     private final CustomJwtDecoder jwtDecoder;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;

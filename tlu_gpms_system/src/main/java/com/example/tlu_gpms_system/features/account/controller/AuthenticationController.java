@@ -7,6 +7,8 @@ import com.example.tlu_gpms_system.features.account.dto.request.IntrospectReques
 import com.example.tlu_gpms_system.features.account.dto.response.IntrospectResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.LoginResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.UserInfoResponse;
+import com.example.tlu_gpms_system.features.account.entity.Account;
+import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
 import com.example.tlu_gpms_system.features.account.service.AuthenticationService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -22,7 +25,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticationController {
-
+    private final AccountRepository accountRepository;
     private final AuthenticationService authenticationService;
 
     @PostMapping("/login")
@@ -116,6 +119,23 @@ public class AuthenticationController {
                 .code(1000)
                 .data(authenticationService.userInfo())
                 .message("Thông tin người dùng")
+                .build();
+    }
+
+    @PostMapping("/login-postman")
+    @Transactional
+    public APIResponse<LoginResponse> loginPostMan(@RequestBody String email) {
+        Account account = accountRepository.findByEmailAndStatus(email).orElseThrow(()
+                -> new AppException(ErrorCode.ACCOUNT_INVALID));
+        String createToken = authenticationService.createToken(account);
+        LoginResponse response = LoginResponse.builder()
+                .token(createToken)
+                .authenticated(true)
+                .build();
+        return APIResponse.<LoginResponse>builder()
+                .code(1000)
+                .message("Đăng nhập thành công")
+                .data(response)
                 .build();
     }
 }

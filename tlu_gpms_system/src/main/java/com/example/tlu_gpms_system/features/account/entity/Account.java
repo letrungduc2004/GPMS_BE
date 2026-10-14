@@ -1,13 +1,10 @@
 package com.example.tlu_gpms_system.features.account.entity;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 
 @Table(name = "account")
 @Entity

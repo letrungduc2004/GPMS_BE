@@ -39,10 +39,19 @@ public enum ErrorCode {
     // ACCOUNT
     USER_NOT_FOUND(4000, "Tài khoản của bạn không tồn tại", HttpStatus.NOT_FOUND),
     ACCOUNT_INVALID(4000, "Tài khoản của bạn không được cấp phép hệ thống", HttpStatus.NOT_FOUND),
+    EMAIL_EMPTY(4000, "Email không được để trống", HttpStatus.BAD_REQUEST),
+    EMAIL_INVALID(4000, "Email không đúng định dạng", HttpStatus.BAD_REQUEST),
+    FIRST_NAME_EMPTY(4000, "Họ không được để trống", HttpStatus.BAD_REQUEST),
+    LAST_NAME_EMPTY(4000, "Tên không được để trống", HttpStatus.BAD_REQUEST),
+    STUDENT_CODE_EMPTY(4000, "Mã sinh viên không được để trống", HttpStatus.BAD_REQUEST),
+    BATCH_EMPTY(4000, "Khóa học không được để trống", HttpStatus.BAD_REQUEST),
+    CLASS_NAME_EMPTY(4000, "Tên lớp không được để trống", HttpStatus.BAD_REQUEST),
+    MAJOR_ID_NULL(4000, "Ngành học không được để trống", HttpStatus.BAD_REQUEST),
 
-
-
-
+    // BUSINESS LOGIC
+    EMAIL_EXIST(3001, "Email sinh viên đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+    STUDENT_CODE_EXIST(3002, "Mã sinh viên đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+    MAJOR_NOT_FOUND(3003, "Ngành học không tồn tại", HttpStatus.NOT_FOUND),
     ;
     private int code;
     private String message;

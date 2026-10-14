@@ -33,4 +33,8 @@ public class Teacher {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "major_id")
     Major major;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
+    Account account;
 }

@@ -79,6 +79,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
 
+
     // Tạo Token: header: chứa thuật toán kí(HS256)
     //            payload: chứa thông tin (người dùng, thời gian tạo - hạn token)
     //            signature: chữ kí số tạo từ header + payload + secret key
@@ -215,11 +216,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public Account getAccountInfo() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
         if (authentication == null
                 || authentication instanceof AnonymousAuthenticationToken) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
+        String userId = authentication.getName();
         // Kiểm tra account còn hạn không
         Account account = accountRepository.findByIdAndStatus(Long.valueOf(userId)).orElseThrow(()
                 -> new AppException(ErrorCode.USER_NOT_FOUND));

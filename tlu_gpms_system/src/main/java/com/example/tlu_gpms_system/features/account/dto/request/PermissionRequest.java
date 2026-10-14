@@ -9,7 +9,6 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class PermissionRequest {
-    @JsonProperty("name")
     private String permissionName;
     private String description;
 }
