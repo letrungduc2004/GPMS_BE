@@ -31,18 +31,17 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
         FROM Student s
         JOIN s.account a
         LEFT JOIN s.major m
-        WHERE a.status = true
-          AND (:lastName IS NULL OR :lastName = '' OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', :lastName, '%')))
+        WHERE (:lastName IS NULL OR :lastName = '' OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', :lastName, '%')))
           AND (:batch IS NULL OR :batch = '' OR s.batch = :batch)
           AND (:majorName IS NULL OR :majorName = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :majorName, '%')))
+        ORDER BY a.status DESC, s.id DESC
     """,
     countQuery = """
         SELECT COUNT(s)
         FROM Student s
         JOIN s.account a
         LEFT JOIN s.major m
-        WHERE a.status = true
-          AND (:lastName IS NULL OR :lastName = '' OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', :lastName, '%')))
+        WHERE (:lastName IS NULL OR :lastName = '' OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', :lastName, '%')))
           AND (:batch IS NULL OR :batch = '' OR s.batch = :batch)
           AND (:majorName IS NULL OR :majorName = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :majorName, '%')))
     """)

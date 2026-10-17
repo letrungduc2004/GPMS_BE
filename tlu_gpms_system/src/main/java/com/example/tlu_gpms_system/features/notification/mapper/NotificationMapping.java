@@ -12,6 +12,7 @@ import java.util.List;
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface NotificationMapping {
     @Mapping(target = "message", source = "content")
+    @Mapping(target = "read", source = "read")
     NotificationResponse toNotiResponse(Notification n);
 
     List<NotificationResponse> toNotiListResponse(List<Notification> n);

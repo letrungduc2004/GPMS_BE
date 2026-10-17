@@ -10,11 +10,13 @@ import java.util.Optional;
 public interface AccountRepository extends JpaRepository<Account, Long> {
     boolean existsByEmail(String userName);
 
-    @Query("select u from Account u " +
+    @Query("select distinct u from Account u " +
+            "left join fetch u.roles " +
             "where u.email =:email and u.status = true ")
     Optional<Account> findByEmailAndStatus(String email);
 
-    @Query("select u from Account u " +
+    @Query("select distinct u from Account u " +
+            "left join fetch u.roles " +
             "where u.id =:accountId and u.status = true ")
     Optional<Account> findByIdAndStatus(Long accountId);
 }

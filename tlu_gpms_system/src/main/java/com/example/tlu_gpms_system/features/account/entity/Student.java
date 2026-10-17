@@ -25,7 +25,7 @@ public class Student {
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private UUID publicId = UuidCreator.getTimeOrderedEpoch();
 
-    @Column(name = "student_code", nullable = false)
+    @Column(name = "student_code", nullable = false, unique = true)
     String studentCode;
 
     @Column(name = "batch", nullable = false)

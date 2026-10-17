@@ -16,16 +16,18 @@ import java.util.List;
 public class NotificationController {
     private final NotificationService notificationService;
 
-    @GetMapping("/notification" )
-    public APIResponse<List<NotificationResponse>> getNotification() {
+    @GetMapping("/notification")
+    public APIResponse<List<NotificationResponse>> getNotification(
+            @RequestParam(required = false) Boolean isRead) {
         return APIResponse.<List<NotificationResponse>>builder()
                 .code(1000)
-                .data(notificationService.getNotification())
-                .message("Danh sách thông báo chưa đọc")
+                .data(notificationService.getNotification(isRead))
+                .message("Lấy danh sách thông báo thành công")
                 .build();
     }
 
-    @GetMapping(value = "/connection" , produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+
+    @GetMapping(value = "/connection", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter connectNotification() {
         return notificationService.getConnection();
     }
@@ -39,12 +41,12 @@ public class NotificationController {
 //                .build();
 //    }
 
-//    @PatchMapping("/notification" )
-//    public APIResponse<Void > readNotification() {
-//        notificationService.readNotification();
-//        return APIResponse.<Void>builder()
-//                .code(1000)
-//                .message("Đã đọc toàn bộ thông báo")
-//                .build();
-//    }
+    @PatchMapping("/notification")
+    public APIResponse<Void> readNotification() {
+        notificationService.readNotification();
+        return APIResponse.<Void>builder()
+                .code(1000)
+                .message("Đã đọc toàn bộ thông báo")
+                .build();
+    }
 }

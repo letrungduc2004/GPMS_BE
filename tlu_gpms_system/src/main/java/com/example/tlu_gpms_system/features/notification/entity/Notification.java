@@ -23,6 +23,7 @@ public class Notification {
     Long id;
 
     // publicId dùng để truy xuất thông tin
+    @Builder.Default
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private UUID publicId = UuidCreator.getTimeOrderedEpoch();
 
@@ -36,7 +37,7 @@ public class Notification {
     boolean isRead;
 
     @Column(name = "created_at", nullable = false)
-    LocalDateTime created_at;
+    LocalDateTime createdAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id")

@@ -21,6 +21,7 @@ public class Semester {
     Long id;
 
     // publicId dùng để truy xuất thông tin
+    @Builder.Default
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private UUID publicId = UuidCreator.getTimeOrderedEpoch();
 

@@ -32,14 +32,13 @@ public class NotificationServiceImpl implements NotificationService {
     // Lấy các kết nối mà User chưa đọc
     @Override
     @Transactional
-    public List<NotificationResponse> getNotification() {
+    public List<NotificationResponse> getNotification(Boolean isRead) {
         Account account = authenticationService.getAccountInfo();
-        List<Notification> notification = notificationRepository.findNotificationNotRead(account.getId());
+        List<Notification> notification = notificationRepository.findNotifications(account.getId(), isRead);
         return notificationMapping.toNotiListResponse(notification);
     }
 
     @Override
-    @Transactional
     public SseEmitter getConnection() {
         // Thông tin kết nối user
         Account account = authenticationService.getAccountInfo();
@@ -75,7 +74,7 @@ public class NotificationServiceImpl implements NotificationService {
         // Người nhận: recipient
         Notification notification = new Notification();
         notification.setContent(message);
-        notification.setCreated_at(LocalDateTime.now());
+        notification.setCreatedAt(LocalDateTime.now());
         notification.setAccount(recipient);
         notification.setRead(false);
         notificationRepository.save(notification);

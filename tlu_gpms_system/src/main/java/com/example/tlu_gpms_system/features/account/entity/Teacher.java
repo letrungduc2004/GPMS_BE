@@ -2,9 +2,7 @@ package com.example.tlu_gpms_system.features.account.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.util.UUID;
@@ -13,6 +11,9 @@ import java.util.UUID;
 @Entity
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Teacher {
     @Id
@@ -20,6 +21,7 @@ public class Teacher {
     Long id;
 
     // publicId dùng để truy xuất thông tin
+    @Builder.Default
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private UUID publicId = UuidCreator.getTimeOrderedEpoch();
 

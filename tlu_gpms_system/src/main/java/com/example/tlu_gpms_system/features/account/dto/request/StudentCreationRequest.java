@@ -24,6 +24,7 @@ public class StudentCreationRequest {
     @NotBlank(message = "LAST_NAME_EMPTY")
     String lastName; // Tên
 
+    @NotBlank(message = "PHONE_EMPTY")
     String phone;
 
     @NotBlank(message = "STUDENT_CODE_EMPTY")

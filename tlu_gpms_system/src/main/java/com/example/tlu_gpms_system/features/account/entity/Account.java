@@ -24,21 +24,20 @@ public class Account {
     @Column(nullable = false, unique = true)
     String email;
 
-    @Column(name = "first_name")
+    @Column(name = "first_name", nullable = false)
     String firstName; // Họ
 
-    @Column(name = "last_name")
+    @Column(name = "last_name", nullable = false)
     String lastName; // Tên
 
-    @Column(name = "phone")
+    @Column(name = "phone", nullable = false)
     String phone;
 
     @Column(name = "status", nullable = false)
     Boolean status;
 
+    @Builder.Default
     @ManyToMany
-    @JoinTable(name = "user_role",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_name"))
+    @JoinTable(name = "user_role", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_name"))
     Set<Role> roles = new HashSet<>();
 }

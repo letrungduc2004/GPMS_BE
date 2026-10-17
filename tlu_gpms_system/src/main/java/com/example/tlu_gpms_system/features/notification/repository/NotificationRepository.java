@@ -12,10 +12,14 @@ import java.util.List;
 
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
-    // Lấy các kết nối mà người dùng chưa đọc
+    // Hiển thị toàn bộ thông báo, thông báo chưa đọc hiển thị lên đầu
+    // Sắp xếp thời gian mới nhất -> cũ nhất     LocalDateTime createdAt;
     @Query("select n from Notification n " +
-            "where n.account.id =:accountId and n.isRead = false ")
-    List<Notification> findNotificationNotRead(Long accountId);
+            "where n.account.id = :accountId " +
+            "and (:isRead is null or n.isRead = :isRead) " +
+            "order by n.isRead asc, n.createdAt desc")
+    List<Notification> findNotifications(@Param("accountId") Long accountId, @Param("isRead") Boolean isRead);
+
 
     // Update toàn bộ thông báo chưa đọc theo userId
     @Modifying

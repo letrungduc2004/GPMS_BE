@@ -1,18 +1,21 @@
 package com.example.tlu_gpms_system.features.account.service.impl;
 
 import com.example.tlu_gpms_system.features.account.entity.Role;
-
 import com.example.tlu_gpms_system.configuration.exception.AppException;
 import com.example.tlu_gpms_system.configuration.exception.ErrorCode;
 import com.example.tlu_gpms_system.features.account.dto.request.StudentCreationRequest;
+import com.example.tlu_gpms_system.features.account.dto.request.TeacherCreationRequest;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentResponse;
+import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.entity.Account;
 import com.example.tlu_gpms_system.features.account.entity.Major;
 import com.example.tlu_gpms_system.features.account.entity.Student;
+import com.example.tlu_gpms_system.features.account.entity.Teacher;
 import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
 import com.example.tlu_gpms_system.features.account.repository.MajorRepository;
 import com.example.tlu_gpms_system.features.account.repository.RoleRepository;
 import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
+import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;
 import com.example.tlu_gpms_system.features.account.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +34,7 @@ import java.util.Set;
 public class UserServiceImpl implements UserService {
 
     private final StudentRepository studentRepository;
+    private final TeacherRepository teacherRepository;
     private final AccountRepository accountRepository;
     private final MajorRepository majorRepository;
     private final RoleRepository roleRepository;
@@ -48,15 +52,19 @@ public class UserServiceImpl implements UserService {
         if (requests == null || requests.isEmpty()) {
             return;
         }
-
+        // Xem xét lại các case exception
+        // Nếu account tồn tại -> Update trạng thái
+        // Case: đúng tên, sdt, nhầm mail(MSSV) với sinh viên cũ ?
         Role studentRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.STUDENT.name())
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
 
         for (StudentCreationRequest request : requests) {
             if (accountRepository.existsByEmail(request.getEmail())) {
+                // Nếu đã tồn tại Update trạng thái
                 throw new AppException(ErrorCode.EMAIL_EXIST);
             }
             if (studentRepository.existsByStudentCode(request.getStudentCode())) {
+                // Nếu đã tồn tại Update trạng thái
                 throw new AppException(ErrorCode.STUDENT_CODE_EXIST);
             }
 
@@ -82,7 +90,55 @@ public class UserServiceImpl implements UserService {
                     .major(major)
                     .account(savedAccount)
                     .build();
+
             studentRepository.save(student);
+        }
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    public Page<TeacherResponse> getAllTeachers(String lastName, String organization, String majorName, Pageable pageable) {
+        return teacherRepository.findAllTeachers(lastName, organization, majorName, pageable);
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    public void createTeachers(List<TeacherCreationRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return;
+        }
+
+        Role supervisorRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.SUPERVISOR.name())
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
+
+        for (TeacherCreationRequest request : requests) {
+            if (accountRepository.existsByEmail(request.getEmail())) {
+                throw new AppException(ErrorCode.EMAIL_EXIST);
+            }
+
+            Major major = majorRepository.findById(request.getMajorId())
+                    .orElseThrow(() -> new AppException(ErrorCode.MAJOR_NOT_FOUND));
+
+            Account account = Account.builder()
+                    .email(request.getEmail())
+                    .firstName(request.getFirstName())
+                    .lastName(request.getLastName())
+                    .phone(request.getPhone())
+                    .status(true)
+                    .roles(new HashSet<>(Set.of(supervisorRole)))
+                    .build();
+
+            Account savedAccount = accountRepository.save(account);
+
+            Teacher teacher = Teacher.builder()
+                    .organization(request.getOrganization())
+                    .amount(request.getAmount())
+                    .major(major)
+                    .account(savedAccount)
+                    .build();
+
+            teacherRepository.save(teacher);
         }
     }
 }

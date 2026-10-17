@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -71,10 +72,26 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         Account account = accountRepository.findByEmailAndStatus(userInfo.getEmail()).orElseThrow(()
                 -> new AppException(ErrorCode.ACCOUNT_INVALID));
 
+        StringBuilder builder = new StringBuilder();
+        if (account.getFirstName() != null) {
+            builder.append(account.getFirstName()).append(" ");
+        }
+        if (account.getLastName() != null) {
+            builder.append(account.getLastName());
+        }
+
+        Set<String> roles = account.getRoles() != null
+                ? account.getRoles().stream()
+                        .map(Role::getName)
+                        .collect(Collectors.toSet())
+                : Collections.emptySet();
+
         // Login thành công tạo token
         return LoginResponse.builder()
                 .token(createToken(account))
                 .authenticated(true)
+                .name(builder.toString().trim())
+                .roles(roles)
                 .build();
     }
 
@@ -107,11 +124,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public String getRoleAndPermission(Account account) {
         StringJoiner joiner = new StringJoiner(" ");
         Set<Role> roles = account.getRoles();
-        for (Role r : roles) {
-            joiner.add("ROLE_" + r.getName());
-            Set<Permission> permissions = r.getPermissions();
-            for (Permission p : permissions) {
-                joiner.add(p.getName());
+        if (roles != null) {
+            for (Role r : roles) {
+                if (r != null && r.getName() != null) {
+                    joiner.add("ROLE_" + r.getName());
+                    Set<Permission> permissions = r.getPermissions();
+                    if (permissions != null) {
+                        for (Permission p : permissions) {
+                            if (p != null && p.getName() != null) {
+                                joiner.add(p.getName());
+                            }
+                        }
+                    }
+                }
             }
         }
         return joiner.toString();
@@ -217,24 +242,43 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public Account getAccountInfo() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null
-                || authentication instanceof AnonymousAuthenticationToken) {
+                || authentication instanceof AnonymousAuthenticationToken
+                || !authentication.isAuthenticated()) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         String userId = authentication.getName();
-        // Kiểm tra account còn hạn không
-        Account account = accountRepository.findByIdAndStatus(Long.valueOf(userId)).orElseThrow(()
-                -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return account;
+        try {
+            Long accountId = Long.valueOf(userId);
+            // Kiểm tra account còn hạn không
+            return accountRepository.findByIdAndStatus(accountId).orElseThrow(()
+                    -> new AppException(ErrorCode.USER_NOT_FOUND));
+        } catch (NumberFormatException e) {
+            log.error("Invalid user ID in authentication token: {}", userId);
+            throw new AppException(ErrorCode.TOKEN_INVALID);
+        }
     }
 
     @Override
+    @Transactional
     public UserInfoResponse userInfo() {
         Account account = getAccountInfo();
         StringBuilder builder = new StringBuilder();
-        builder.append(account.getFirstName() + " ");
-        builder.append(account.getLastName());
+        if (account.getFirstName() != null) {
+            builder.append(account.getFirstName()).append(" ");
+        }
+        if (account.getLastName() != null) {
+            builder.append(account.getLastName());
+        }
+
+        Set<String> roles = account.getRoles() != null
+                ? account.getRoles().stream()
+                        .map(Role::getName)
+                        .collect(Collectors.toSet())
+                : Collections.emptySet();
+
         return UserInfoResponse.builder()
-                .name(builder.toString())
+                .name(builder.toString().trim())
+                .roles(roles)
                 .build();
     }
 }

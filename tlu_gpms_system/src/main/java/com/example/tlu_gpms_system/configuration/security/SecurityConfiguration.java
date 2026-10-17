@@ -26,7 +26,7 @@ import java.util.List;
 public class SecurityConfiguration {
 
     private final String[] PUBLIC_POST_ENDPOINT = {
-            "/login-postman", "/login", "/refresh-token", "/logout", "/notification/**"
+            "/login-postman", "/login", "/refresh-token", "/log-out"
     };
     private final String[] PUBLIC_GET_ENDPOINT = {};
 
@@ -40,22 +40,19 @@ public class SecurityConfiguration {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         // Cấu hình endpoint mặc định
-        http.authorizeHttpRequests(config ->
-                config.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINT).permitAll()
-                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINT).permitAll()
-                        .anyRequest().authenticated());
+        http.authorizeHttpRequests(config -> config.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.POST, PUBLIC_POST_ENDPOINT).permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINT).permitAll()
+                .anyRequest().authenticated());
 
         // Cấu hình protected endpoint (hỗ trợ đọc token từ Header & HttpOnly Cookie)
-        http.oauth2ResourceServer(oauth ->
-                oauth.bearerTokenResolver(bearerTokenResolver())
-                        .jwt(config -> config.decoder(jwtDecoder)
-                                .jwtAuthenticationConverter(converter()))
-                        .authenticationEntryPoint(authenticationEntryPoint));
+        http.oauth2ResourceServer(oauth -> oauth.bearerTokenResolver(bearerTokenResolver())
+                .jwt(config -> config.decoder(jwtDecoder)
+                        .jwtAuthenticationConverter(converter()))
+                .authenticationEntryPoint(authenticationEntryPoint));
 
         // Cấu hình bắt lỗi 403 ở FilterChain (phân quyền theo endpoint)
-        http.exceptionHandling(config ->
-                config.accessDeniedHandler(accessDeniedHandler));
+        http.exceptionHandling(config -> config.accessDeniedHandler(accessDeniedHandler));
 
         http.csrf(config -> config.disable());
         return http.build();
@@ -76,7 +73,7 @@ public class SecurityConfiguration {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // Hỗ trợ cả React chạy trên port 3000 lẫn Vite port 5173
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         // Cho phép trình duyệt gửi cookie tự động
@@ -89,7 +86,23 @@ public class SecurityConfiguration {
     @Bean
     public BearerTokenResolver bearerTokenResolver() {
         return request -> {
-            // 1. Ưu tiên kiểm tra Header "Authorization: Bearer ..." trước (để test trên Postman / Swagger)
+            String path = request.getRequestURI();
+            String method = request.getMethod();
+
+            // Chỉ bỏ qua trích xuất token cho các request POST tới endpoint public (login,
+            // refresh-token, logout...)
+            // để tránh BearerTokenAuthenticationFilter chặn lỗi 401 khi cookie access_token
+            // đã hết hạn
+            if (HttpMethod.POST.matches(method)) {
+                for (String publicEndpoint : PUBLIC_POST_ENDPOINT) {
+                    if (path.equals(publicEndpoint)) {
+                        return null;
+                    }
+                }
+            }
+
+            // 1. Ưu tiên kiểm tra Header "Authorization: Bearer ..." trước (để test trên
+            // Postman / Swagger)
             String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 return authHeader.substring(7);

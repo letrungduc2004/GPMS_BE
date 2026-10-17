@@ -8,7 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 public interface NotificationService {
-    List<NotificationResponse> getNotification();
+    List<NotificationResponse> getNotification( Boolean isRead);
     SseEmitter getConnection();
     void pushNotification(String message, Account recipient);
     void readNotification();

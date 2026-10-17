@@ -80,6 +80,10 @@ features/<feature_name>/
 ## Convention ErrorCode
 - Khi thêm error mới, thêm vào `ErrorCode` enum với format: `ERROR_NAME(code, "message tiếng Việt", HttpStatus.XXX)`
 - Code ranges: 1xxx = Common (1000 = Success, 1001 = System Error,...), 2xxx = Security, 3xxx = Business Logic, 4xxx = External Service & Field Validation
+- **Cơ chế Validation Exception trong GlobalException**:
+  + Bắt `MethodArgumentNotValidException` (cho `@Valid` với DTO đơn lẻ)
+  + Bắt `HandlerMethodValidationException` (cho `@Valid` với `List<DTO>` từ Spring Boot 3 / Spring 6.1+)
+  + Cả 2 đều trích xuất `defaultMessage` (key) để map sang `ErrorCode.valueOf(key)` trả về `APIResponse` chuẩn.
 
 ## Convention Security
 - Token: JWT HS256, lưu trong HttpOnly Cookie hoặc Header Authorization
