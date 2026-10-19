@@ -4,12 +4,14 @@ VALUES (UUID_TO_BIN(UUID()), 'Công nghệ Thông tin');
 
 INSERT INTO major (public_id, name, faculty_id)
 VALUES (UUID_TO_BIN(UUID()), 'Kỹ thuật phần mềm', 1);
-
 INSERT INTO major (public_id, name, faculty_id)
 VALUES (UUID_TO_BIN(UUID()), 'Hệ thống thông tin', 1);
-
 INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'Khoa học máy tính', 1);
+VALUES (UUID_TO_BIN(UUID()), 'Công nghệ thông tin', 1);
+INSERT INTO major (public_id, name, faculty_id)
+VALUES (UUID_TO_BIN(UUID()), 'An ninh mạng', 1);
+INSERT INTO major (public_id, name, faculty_id)
+VALUES (UUID_TO_BIN(UUID()), 'Trí tuệ nhân tạo và Khoa học dữ liệu', 1);
 
 -- =====================================================================
 -- Seed dữ liệu: permission, role, role_permission

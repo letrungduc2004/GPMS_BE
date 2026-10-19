@@ -10,6 +10,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Slf4j
 @ControllerAdvice
@@ -73,6 +76,24 @@ public class GlobalException {
                 .status(errorCode.getHttpStatus())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
+    }
+
+    // File upload vượt quá spring.servlet.multipart.max-file-size
+    @ExceptionHandler(value = MaxUploadSizeExceededException.class)
+    public ResponseEntity<APIResponse> maxUploadSize(MaxUploadSizeExceededException exception) {
+        return appException(new AppException(ErrorCode.FILE_TOO_LARGE));
+    }
+
+    // Request multipart thiếu part "file"
+    @ExceptionHandler(value = MissingServletRequestPartException.class)
+    public ResponseEntity<APIResponse> missingRequestPart(MissingServletRequestPartException exception) {
+        return appException(new AppException(ErrorCode.FILE_EMPTY));
+    }
+
+    // Tham số query sai kiểu: majorId không phải UUID, status ngoài ACTIVE/INACTIVE/ALL...
+    @ExceptionHandler(value = MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<APIResponse> argumentTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return appException(new AppException(ErrorCode.INVALID_REQUEST));
     }
 
     private ErrorCode getErrorCode(String keyException) {

@@ -33,7 +33,7 @@ public class Teacher {
     Long amount;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "major_id")
+    @JoinColumn(name = "major_id", nullable = false)
     Major major;
 
     @OneToOne(fetch = FetchType.LAZY)

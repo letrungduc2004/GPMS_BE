@@ -25,6 +25,9 @@ public class ApplicationInitConfig implements ApplicationRunner {
             Account user = Account.builder()
                     .email("tlugpmssystem@gmail.com")
                     .status(true)
+                    .firstName("Ad")
+                    .lastName("min")
+                    .phone("0367123456")
                     .roles(new HashSet<>(role))
                     .build();
             accountRepository.save(user);

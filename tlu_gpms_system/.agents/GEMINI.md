@@ -2,18 +2,33 @@
 
 ## Tổng quan dự án
 Đây là hệ thống backend quản lý đồ án tốt nghiệp (Graduation Project Management System) của Trường Đại học Thủy Lợi (TLU).
-- **Tech Stack**: Spring Boot 3.3.3, Java 17, MySQL, Spring Security (OAuth2 Resource Server), Spring AI (Gemini), Cloudinary, MapStruct, Lombok
+- **Tech Stack**: Spring Boot 3.3.3, Java 17, MySQL (JPA, `ddl-auto=update`, `open-in-view=false`), Spring Security (OAuth2 Resource Server, JWT), Spring AI (starter `spring-ai-starter-model-openai`), Cloudinary, Spring Mail, OpenFeign, Apache POI (đọc Excel), MapStruct, Lombok, uuid-creator
 - **Package gốc**: `com.example.tlu_gpms_system`
 - **Base URL API**: Chưa có prefix chung, endpoint đặt trực tiếp (ví dụ: `/student`, `/login`)
+- **Tài liệu nghiệp vụ chi tiết**: `readme.md/Project_Context.md`, `readme.md/work_flow/`, `readme.md/case_execution/`
+
+## Quy tắc làm việc của Agent (BẮT BUỘC)
+- Luôn trả lời user bằng **tiếng Việt**.
+- Nếu nghiệp vụ chưa rõ (role nào được gọi, trạng thái nào hợp lệ, xóa cứng hay xóa mềm...) → **HỎI user trước khi code**, KHÔNG tự bịa nghiệp vụ.
+- Đọc code hiện có của feature liên quan trước khi viết code mới, và viết theo đúng style đang dùng.
+- Build và test bằng Maven Wrapper: `.\mvnw.cmd clean compile`, `.\mvnw.cmd test` (Windows) hoặc `./mvnw ...`.
+- Khi thêm permission/role mới → cập nhật thêm `DB_UPDATE/DATA_ROLE_PERMISSION.txt`.
+- Khi xong một tính năng → cập nhật tài liệu trong `readme.md/case_execution/<tinh_nang>.md` (nếu user yêu cầu hoặc tính năng có luồng nghiệp vụ mới).
+- KHÔNG tự `git commit` / `git push` khi user chưa yêu cầu.
+
+## An toàn (BẮT BUỘC)
+- KHÔNG đọc, in ra, trích dẫn hay commit giá trị trong `application.properties` (client id, secret, mật khẩu, API key...). Cần cấu hình mới thì dùng placeholder `${ENV_NAME}` và báo user tự điền.
+- KHÔNG đổi `spring.jpa.hibernate.ddl-auto` và KHÔNG bật `open-in-view`.
+- KHÔNG ghi log dữ liệu cá nhân (email, số điện thoại, token) ở mức INFO.
 
 ## Ngôn ngữ
 - **Comment trong code**: Tiếng Việt
 - **Error message (ErrorCode)**: Tiếng Việt
 - **Tên biến, class, method**: Tiếng Anh (theo chuẩn Java)
-- **API endpoint URL**: Tiếng Anh, lowercase, dùng dấu gạch ngang nếu cần
+- **API endpoint URL**: Tiếng Anh, lowercase, **danh từ số ít** theo code hiện có (`/student`, `/teacher`, `/role`, `/notification`), dùng dấu gạch ngang nếu cần (`/my-info`, `/refresh-token`)
 
 ## Kiến trúc Feature-based (BẮT BUỘC)
-Mỗi feature module PHẢI tuân theo cấu trúc 6 layer:
+Mỗi feature module PHẢI tuân theo cấu trúc sau:
 ```
 features/<feature_name>/
 ├── controller/          # REST Controller, dùng @RestController
@@ -24,82 +39,167 @@ features/<feature_name>/
 ├── mapper/              # MapStruct Mapper interface
 ├── repository/          # Spring Data JPA Repository
 └── service/
-    ├── <Feature>Service.java      # Service interface
+    ├── <Feature>Service.java          # Service interface
+    ├── helper/                        # (tùy chọn) class hỗ trợ riêng của feature: đọc file, validate từng dòng...
     └── impl/
         └── <Feature>ServiceImpl.java  # Service implementation
 ```
+- `service/helper/`: class `final`, constructor `private`, method `static`, không phải Spring bean (ví dụ: `StudentExcelReader`, `StudentRowValidator`, `StudentColumn`, `StudentRowData` trong `features/account/service/helper`).
+
+### Quy tắc độc lập giữa các feature (Modular Monolith, BẮT BUỘC)
+- Các feature đóng gói độc lập.
+- CẤM inject chéo Repository hoặc tự ý `save`/`delete` Entity của feature khác.
+- Muốn gọi nghiệp vụ hoặc lấy dữ liệu giữa các feature BẮT BUỘC gọi qua `Service` interface (ví dụ: `AccountService` gọi `SemesterService`, không gọi `SemesterRepository`).
+- NGOẠI LỆ: được viết `@Query` có `JOIN` sang entity của feature khác ngay ở tầng Repository, **chỉ để đọc** (Read-only DTO Projection), nhằm tối ưu hiệu năng và tránh N+1 Query. Không dùng ngoại lệ này để ghi dữ liệu.
+
+## Tái sử dụng code (BẮT BUỘC kiểm tra trước khi viết mới)
+Trước khi viết hàm tiện ích mới, kiểm tra `common/` đã có chưa:
+- `common/enums/Role.java` — danh sách role chuẩn
+- `common/enums/` — các enum dùng chung (ví dụ `RowImportStatus`)
+- `common/utils/excel/` — nhóm tiện ích dùng chung cho import file (Excel và dữ liệu người dùng nhập):
+  + `ExcelUtils` — `openXlsx` (kiểm tra rỗng, đuôi `.xlsx`, magic bytes rồi mở workbook; ném `FILE_EMPTY` / `FILE_INVALID_FORMAT`), `hasMergedCells`, `readRow`, `isBlankRow`, `readCellAsText`
+  + `TextNormalizer` — `normalize` (xóa ký tự ẩn, gộp khoảng trắng, trim, NFC; `null` → `""`), `toLowerKey`, `toUpperKey` (key so sánh không phân biệt hoa thường)
+  + `DuplicateUtils` — `findDuplicateIndexes` (vị trí mọi phần tử có key bị trùng, bỏ qua key `null`)
+- `common/utils/cloudinary/CloudinaryFunction` — upload/xóa file Cloudinary
+- `common/utils/mail/MailFuncation` — gửi mail
+- Hàm dùng được cho nhiều feature → đặt trong nhóm phù hợp của `common/utils/` (tiện ích liên quan import/xử lý dữ liệu file → `common/utils/excel/`); chỉ dùng cho một feature → đặt trong `features/<feature>/service/helper/`.
+- KHÔNG tạo lại các package cũ `common/utils/text/` hay `common/utils/collection/` (đã gộp vào `common/utils/excel/`).
 
 ## Convention Entity (BẮT BUỘC)
+- Annotation chuẩn: `@Table(name = "...") @Entity @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder @FieldDefaults(level = AccessLevel.PRIVATE)`
+- KHÔNG dùng `@Data` cho Entity (tránh vấn đề equals/hashCode/toString với quan hệ JPA)
 - Primary key: `Long id` với `@GeneratedValue(strategy = GenerationType.IDENTITY)` — chỉ dùng nội bộ
-- Public identifier: `UUID publicId = UuidCreator.getTimeOrderedEpoch()` — expose ra API
-- Dùng `@FieldDefaults(level = AccessLevel.PRIVATE)` thay vì khai báo `private` từng field
-- Dùng `@Getter`, `@Setter` (hoặc `@Data`), KHÔNG dùng `@Data` cho Entity (tránh vấn đề equals/hashCode)
-- Audit fields: `createdAt`, `updatedAt` (dùng `LocalDateTime`)
+- Public identifier (expose ra API) — **BẮT BUỘC có `@Builder.Default`**, nếu thiếu thì `@Builder` sẽ tạo entity với `publicId = null`:
+  ```java
+  @Builder.Default
+  @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+  UUID publicId = UuidCreator.getTimeOrderedEpoch();
+  ```
+- Mọi field có giá trị khởi tạo (collection `= new ArrayList<>()`, `= new HashSet<>()`, giá trị mặc định) cũng phải có `@Builder.Default`
+- KHÔNG gán lại `publicId` trong `@PrePersist`
+- Audit fields `createdAt`, `updatedAt` (`LocalDateTime`): BẮT BUỘC với entity **mới**; entity cũ chưa có thì không tự ý thêm
 - Mọi column name dùng snake_case trong `@Column(name = "...")`
+- Quan hệ `@ManyToOne` / `@OneToOne` mặc định đặt `fetch = FetchType.LAZY`
 
 ## Convention DTO
-- Request DTO: `<Feature>Request.java` — dùng `@Getter`, `@Setter`, `@FieldDefaults(level = AccessLevel.PRIVATE)`
-- Response DTO: `<Feature>Response.java` — dùng `@Getter`, `@Setter`, `@Builder`, `@FieldDefaults(level = AccessLevel.PRIVATE)`
-- KHÔNG expose `id` (Long) ra response, chỉ expose `publicId` (UUID)
+- Đặt tên: Request `<Feature>Request.java` hoặc `<Feature>CreationRequest.java`; Response `<Feature>Response.java`
+- Annotation chuẩn cho mọi Request/Response DTO (BẮT BUỘC khai báo đầy đủ):
+  ```java
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @Builder
+  @FieldDefaults(level = AccessLevel.PRIVATE)
+  ```
+  + `@NoArgsConstructor` + `@Setter`: Jackson cần để đọc JSON vào Request; `@AllArgsConstructor` cần khi dùng `@Builder` cùng `@NoArgsConstructor`
+  + DTO Projection: thêm constructor riêng khớp đúng thứ tự field trong `SELECT new ...(...)` nếu query không lấy đủ field (mẫu `StudentResponse`, `TeacherResponse`)
+- **Class có chủ đích riêng** (không phải DTO nhận/trả qua API) được tự ý bỏ bớt annotation không cần thiết, và ghi comment tiếng Việt giải thích chủ đích. Ví dụ:
+  + Value object bất biến nội bộ: `StudentRowData`, `TeacherRowData` (`service/helper/`) chỉ dùng `@Getter @Builder @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)` — tạo một lần qua `fromCells` / `fromRequest`, không bị sửa sau khi chuẩn hóa, không qua Jackson
+  + Wrapper chỉ dùng để trả về: `APIResponse` (`@Getter @Setter @Builder`)
+  + Khi bỏ annotation, đảm bảo không làm hỏng chỗ đang dùng (Jackson deserialize, MapStruct, `new ...()` trong query)
+- KHÔNG expose `id` (Long) ra response/request, chỉ expose `publicId` (UUID)
 - **Validation trong Request DTO (BẮT BUỘC)**:
   + Thuộc tính `message` trong các annotation validate (`@NotBlank`, `@NotNull`, `@Size`, `@Email`...) PHẢI là **KEY** của `ErrorCode` (ví dụ: `@NotBlank(message = "EMAIL_EMPTY")`), KHÔNG ĐƯỢC viết chuỗi tiếng Việt trực tiếp vào annotation.
-  + Chuỗi message tiếng Việt, mã code (ví dụ `4000`), và `HttpStatus` được định nghĩa tập trung trong `ErrorCode.java`.
-  + *Cơ chế*: `GlobalException` bắt `MethodArgumentNotValidException` và gọi `ErrorCode.valueOf(exception.getFieldError().getDefaultMessage())` để lấy thông tin lỗi.
+  + Chuỗi message tiếng Việt, mã code và `HttpStatus` được định nghĩa tập trung trong `ErrorCode.java`.
+  + *Cơ chế*: `GlobalException` lấy `defaultMessage` rồi gọi `ErrorCode.valueOf(key)`. Nếu key sai chính tả / chưa khai báo → trả về `VALIDATION_FAIL` (1003, 422) và log "Không tìm thấy ErrorCode tương ứng với key". Thêm validate mới thì PHẢI thêm key tương ứng vào `ErrorCode`.
 
 ## Convention Mapper (MapStruct)
 - Dùng `@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)`
 - Interface đặt tên `<Feature>Mapping`
-- Dùng `@Mapping` cho field name khác nhau
+- Dùng `@Mapping` cho field name khác nhau; `@Mapping(target = "id", ignore = true)` và `@Mapping(target = "publicId", ignore = true)` khi map Request → Entity
 - Hỗ trợ method `toEntity()`, `toResponse()`, `toListResponse()`, `toUpdate(@MappingTarget ...)`
 
 ## Convention Service
 - LUÔN tạo interface trước, rồi implementation trong `impl/`
 - Inject dependency bằng `@RequiredArgsConstructor` (constructor injection)
-- Phân quyền: LUÔN đặt `@PreAuthorize("hasRole('ROLE_NAME')")` hoặc `@PreAuthorize("hasAuthority('...')")` tại tầng Service Implementation (KHÔNG đặt ở Controller)
-- Dùng `@Transactional` cho method có write operation
-- Dùng `@Transactional(readOnly = true)` cho method chỉ đọc
+- **Transaction**:
+  + Method đọc dữ liệu (get/list/search): `@Transactional(readOnly = true)`. Đặt ở **cấp class** ServiceImpl để mọi method đọc tự áp dụng.
+  + Mọi method thay đổi dữ liệu (create/update/delete/import/activate...): BẮT BUỘC `@Transactional(rollbackFor = Exception.class)` trên từng method.
+  + KHÔNG dùng `@Transactional` trơn cho method ghi: mặc định Spring chỉ rollback với `RuntimeException`/`Error`, checked exception (ví dụ `IOException` khi đọc file) sẽ vẫn commit phần dữ liệu đã ghi.
 - Throw exception bằng `throw new AppException(ErrorCode.XXX)`
+- Lấy user hiện tại qua `AuthenticationService.getAccountInfo()` (trong Service, không truyền account từ Controller xuống)
+
+## Phân quyền (BẮT BUỘC)
+- `@PreAuthorize` và `@PostAuthorize` **LUÔN đặt ở tầng Service Implementation**, trên từng method public. **KHÔNG BAO GIỜ đặt ở Controller.**
+- `@EnableMethodSecurity` đã bật trong `SecurityConfiguration`.
+- Authority trong JWT (claim `authorities`) gồm `ROLE_<ROLE>` và tên permission, nên:
+  + Theo role: `@PreAuthorize("hasRole('HEAD_OF_DEPARTMENT')")` — viết tên role **không có** tiền tố `ROLE_`
+  + Nhiều role: `@PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")`
+  + Theo permission: `@PreAuthorize("hasAuthority('<PERMISSION_NAME>')")`
+- Tên role PHẢI lấy từ `common/enums/Role.java` (xem mục Roles bên dưới), KHÔNG tự đặt tên khác.
+- `@PostAuthorize`: dùng khi cần kiểm tra trên **đối tượng trả về**, ví dụ chỉ chủ sở hữu hoặc ADMIN được xem:
+  ```java
+  @PostAuthorize("hasRole('ADMIN') or returnObject.ownerAccountId == authentication.name")
+  ```
+  `authentication.name` là `account.id` dạng String. Logic sở hữu phức tạp (GVHD chỉ thấy SV mình hướng dẫn...) → kiểm tra bằng `getAccountInfo()` trong Service và ném `AppException(ErrorCode.FORBIDDEN)`.
+- Unit test Mockito KHÔNG kích hoạt `@PreAuthorize`/`@PostAuthorize`; muốn test phân quyền phải viết integration test.
 
 ## Convention Controller
 - Dùng `@RestController` + `@RequiredArgsConstructor`
 - Return type LUÔN là `APIResponse<T>` (wrapper chung)
-- Lấy thông tin user hiện tại qua `AuthenticationService.getAccountInfo()` (khi cần)
+- KHÔNG đặt `@PreAuthorize`/`@PostAuthorize`, KHÔNG viết logic nghiệp vụ ở Controller
+- Phân trang: `@PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable`
 
 ## Convention API Response (BẮT BUỘC)
-- Wrapper: `APIResponse<T>` với 3 field: `code`, `message`, `data`
-- Mã thành công: LUÔN dùng `code = 1000`
+- Wrapper: `APIResponse<T>` với 3 field: `code`, `message`, `data` (`@JsonInclude(NON_NULL)`)
+- Mã thành công: dùng `code = 1000`
 - API truy vấn (GET): Trả về `APIResponse<T>` chứa `code(1000)` và `data(...)`
-- API thay đổi dữ liệu (POST create, PUT update, DELETE): Trả về `APIResponse<Void>` chứa `code(1000)` và `message("...")` tiếng Việt (ví dụ: "Thêm mới thành công", "Cập nhật thành công", "Xóa thành công"), KHÔNG trả về entity data trong data
+- API thay đổi dữ liệu (POST create, PUT update, DELETE): Trả về `APIResponse<Void>` chứa `code(1000)` và `message("...")` tiếng Việt (ví dụ: "Thêm mới thành công", "Cập nhật thành công", "Xóa thành công"), KHÔNG trả về entity trong data
+- **Ngoại lệ**:
+  + API import/xử lý hàng loạt được trả `data` là kết quả xử lý từng dòng (ví dụ `POST /student/import` trả `StudentImportResponse`, message "Xử lý file import hoàn tất")
+  + Kết quả nghiệp vụ dạng cảnh báo (không phải lỗi) dùng mã `11xx` với HTTP 200 (ví dụ `STUDENT_ALREADY_ACTIVE` 1100)
 - API lỗi: Bắn `AppException(ErrorCode.XXX)`, xử lý tập trung qua `GlobalException` (@ControllerAdvice)
 
 ## Convention Notification
 - Khi cần gửi thông báo real-time, inject `NotificationService` trực tiếp
 - Gọi `notificationService.pushNotification(message, recipientAccount)`
-- SSE (Server-Sent Events) đã được cấu hình sẵn
+- SSE (Server-Sent Events) đã được cấu hình sẵn (timeout 30 phút, heartbeat 20 giây)
 
 ## Convention ErrorCode
 - Khi thêm error mới, thêm vào `ErrorCode` enum với format: `ERROR_NAME(code, "message tiếng Việt", HttpStatus.XXX)`
-- Code ranges: 1xxx = Common (1000 = Success, 1001 = System Error,...), 2xxx = Security, 3xxx = Business Logic, 4xxx = External Service & Field Validation
-- **Cơ chế Validation Exception trong GlobalException**:
-  + Bắt `MethodArgumentNotValidException` (cho `@Valid` với DTO đơn lẻ)
-  + Bắt `HandlerMethodValidationException` (cho `@Valid` với `List<DTO>` từ Spring Boot 3 / Spring 6.1+)
-  + Cả 2 đều trích xuất `defaultMessage` (key) để map sang `ErrorCode.valueOf(key)` trả về `APIResponse` chuẩn.
+- Code ranges hiện tại:
+  + `1000` = Success; `1001–1007` = lỗi chung (`SYSTEM_ERROR`, `VALIDATION_FAIL`, `RESOURCE_NOT_FOUND`...)
+  + `11xx` = cảnh báo nghiệp vụ, HTTP 200 (`STUDENT_ALREADY_ACTIVE` 1100)
+  + `2xxx` = Security / Role / Permission (`UNAUTHORIZED` 2000, `FORBIDDEN` 2001...)
+  + `3xxx` = Business Logic (`EMAIL_EXIST` 3001 ... `STUDENT_PROFILE_MISMATCH` 3005) — lỗi nghiệp vụ mới lấy số tiếp theo, KHÔNG trùng số đã có
+  + `4000` = Field validation, lỗi file import và External Service (Mail, Cloudinary)
+- Lỗi không tìm thấy của entity mới: thêm `<ENTITY>_NOT_FOUND` (3xxx, `HttpStatus.NOT_FOUND`) thay vì dùng chung `RESOURCE_NOT_FOUND`
+- **Cơ chế Exception trong GlobalException**:
+  + `MethodArgumentNotValidException` (cho `@Valid` với DTO đơn lẻ) và `HandlerMethodValidationException` (cho `@Valid` với `List<DTO>`) → map `defaultMessage` sang `ErrorCode.valueOf(key)`
+  + `AppException` → trả theo `errorCode`
+  + `AccessDeniedException` → `FORBIDDEN` (2001, 403)
+  + `MaxUploadSizeExceededException` → `FILE_TOO_LARGE`; `MissingServletRequestPartException` → `FILE_EMPTY`
+  + `Exception` còn lại → `SYSTEM_ERROR` (1001, 500)
 
 ## Convention Security
-- Token: JWT HS256, lưu trong HttpOnly Cookie hoặc Header Authorization
+- Token: JWT HS256, đọc từ cookie `access_token` hoặc header `Authorization: Bearer ...`
+- Subject của JWT = `account.id`; claim `authorities` chứa `ROLE_<ROLE>` + tên permission
 - Token blacklist qua `InvalidateToken` entity
-- Lấy user hiện tại: `SecurityContextHolder` → `authentication.getName()` trả về `account.id`
+- Lấy user hiện tại: `AuthenticationService.getAccountInfo()` (bên trong dùng `authentication.getName()` = `account.id`)
 
 ## Roles trong hệ thống
+Nguồn chuẩn duy nhất: `src/main/java/com/example/tlu_gpms_system/common/enums/Role.java`
 ```
 ADMIN                  — Quản trị viên hệ thống
-HEAD_OF_DEPARTMENT     — Trưởng bộ môn
-TEACHER                — Giảng viên (role nền của giảng viên)
+HEAD_OF_DEPARTMENT     — Trưởng bộ môn (TBM)
+SECRETARY              — Thư ký hội đồng
+CHAIRPERSON            — Chủ tịch hội đồng
+COUNCIL_MEMBER         — Ủy viên hội đồng
+SUPERVISOR             — Giáo viên hướng dẫn (GVHD)
+EXAMINER               — Giáo viên phản biện (GVPB)
+COMMENTING_LECTURER    — Giáo viên nhận xét (GVNX)
 STUDENT                — Sinh viên
 ```
+- KHÔNG có role `TEACHER` / `LECTURER` / `ADVISOR` / `OPPONENT` / `COUNCIL_CHAIR`... Không dùng các tên này trong `@PreAuthorize`.
+- Hiện tại khi TBM thêm giáo viên, hệ thống gán role `SUPERVISOR`.
+- Cần role mới → hỏi user, rồi thêm vào `Role.java` và `DB_UPDATE/DATA_ROLE_PERMISSION.txt`.
 
 ## Convention Testing
-- Viết Unit Test cho Service layer (`@ExtendWith(MockitoExtension.class)`)
-- Viết Integration Test cho Controller + Repository (`@SpringBootTest`, `@AutoConfigureMockMvc`)
+- Chi tiết: xem skill `write-tests`
+- Unit Test cho Service layer (`@ExtendWith(MockitoExtension.class)`), dùng `@Nested`, `@DisplayName` tiếng Việt, AssertJ
+- Integration Test cho Controller (`@SpringBootTest`, `@AutoConfigureMockMvc`) — cần MySQL đang chạy
 - Test class đặt trong `src/test/java` mirror cùng package
-- Naming: `<ClassName>Test.java` cho unit test, `<ClassName>IntegrationTest.java` cho integration test
+- Naming class: `<ClassName>Test.java` cho unit test, `<ClassName>IntegrationTest.java` cho integration test
+- Naming method: `method_condition_expected` (ví dụ `createTeachers_emailExist_throwException`)
+- Chạy test: `.\mvnw.cmd test -Dtest=<ClassName>`

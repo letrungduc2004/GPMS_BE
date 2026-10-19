@@ -69,8 +69,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         // Google Oauth2
         OutBoundUserResponse userInfo = outBoundUserResponse(code);
         // Kiểm tra tai_khoan
-        Account account = accountRepository.findByEmailAndStatus(userInfo.getEmail()).orElseThrow(()
-                -> new AppException(ErrorCode.ACCOUNT_INVALID));
+        Account account = accountRepository.findByEmailAndStatus(userInfo.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.ACCOUNT_INVALID));
 
         StringBuilder builder = new StringBuilder();
         if (account.getFirstName() != null) {
@@ -95,11 +95,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .build();
     }
 
-
-
     // Tạo Token: header: chứa thuật toán kí(HS256)
-    //            payload: chứa thông tin (người dùng, thời gian tạo - hạn token)
-    //            signature: chữ kí số tạo từ header + payload + secret key
+    // payload: chứa thông tin (người dùng, thời gian tạo - hạn token)
+    // signature: chữ kí số tạo từ header + payload + secret key
     @Override
     public String createToken(Account account) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
@@ -124,19 +122,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public String getRoleAndPermission(Account account) {
         StringJoiner joiner = new StringJoiner(" ");
         Set<Role> roles = account.getRoles();
-        if (roles != null) {
-            for (Role r : roles) {
-                if (r != null && r.getName() != null) {
-                    joiner.add("ROLE_" + r.getName());
-                    Set<Permission> permissions = r.getPermissions();
-                    if (permissions != null) {
-                        for (Permission p : permissions) {
-                            if (p != null && p.getName() != null) {
-                                joiner.add(p.getName());
-                            }
-                        }
-                    }
-                }
+        for (Role r : roles) {
+            joiner.add("ROLE_" + r.getName());
+            Set<Permission> permissions = r.getPermissions();
+            for (Permission p : permissions) {
+                joiner.add(p.getName());
             }
         }
         return joiner.toString();
@@ -156,8 +146,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             String userId = signedJWT.getJWTClaimsSet().getSubject();
             // Kiểm tra thêm status phòng tránh case
             // Admin vô hiệu hóa nhưng người dùng vẫn còn hạn
-            Account account = accountRepository.findByIdAndStatus(Long.valueOf(userId)).orElseThrow(()
-                    -> new AppException(ErrorCode.USER_NOT_FOUND));
+            Account account = accountRepository.findByIdAndStatus(Long.valueOf(userId))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
             // Chỉ refresh: nếu time hiện tại < (hạn token + thời gian tối đa refresh)
             if (Instant.now().isAfter(maxTimeRefresh)) {
@@ -250,8 +240,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             Long accountId = Long.valueOf(userId);
             // Kiểm tra account còn hạn không
-            return accountRepository.findByIdAndStatus(accountId).orElseThrow(()
-                    -> new AppException(ErrorCode.USER_NOT_FOUND));
+            return accountRepository.findByIdAndStatus(accountId)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         } catch (NumberFormatException e) {
             log.error("Invalid user ID in authentication token: {}", userId);
             throw new AppException(ErrorCode.TOKEN_INVALID);

@@ -31,14 +31,14 @@ public class Student {
     @Column(name = "batch", nullable = false)
     String batch; // Khóa
 
-    @Column(name = "className", nullable = false)
+    @Column(name = "class_name", nullable = false)
     String className; // Tên lớp
 
     @Column(name = "status", nullable = false)
     Boolean status;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "major_id")
+    @JoinColumn(name = "major_id", nullable = false)
     Major major;
 
     @OneToOne(fetch = FetchType.LAZY)

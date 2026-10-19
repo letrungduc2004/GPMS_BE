@@ -5,6 +5,8 @@ import lombok.experimental.FieldDefaults;
 
 import java.util.UUID;
 
+// 1 dòng trên bảng danh sách sinh viên: chỉ giữ cột để Trưởng bộ môn dò nhanh.
+// Thông tin đầy đủ (email, SĐT, khóa...) lấy qua GET /student/{publicId} -> StudentDetailResponse
 @Getter
 @Setter
 @NoArgsConstructor
@@ -12,17 +14,10 @@ import java.util.UUID;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class StudentResponse {
-    UUID publicId;
+    UUID publicId; // Không hiển thị, FE dùng để mở popup chi tiết và bấm Kích hoạt
     String studentCode;
-    String name;
-    String majorName;
+    String name; // Họ tên đầy đủ: Họ + Tên, ví dụ "Lê Trung Đức"
+    String majorName; // Trưởng bộ môn quản lý nhiều ngành nên giữ cột này
     String className;
-    String batch;
-
-    public StudentResponse(String name, String majorName, String className, String batch) {
-        this.name = name;
-        this.majorName = majorName;
-        this.className = className;
-        this.batch = batch;
-    }
+    Boolean status; // true: đang hoạt động (cả Account và Student đều bật); false: đã tắt, FE hiện nút Kích hoạt
 }

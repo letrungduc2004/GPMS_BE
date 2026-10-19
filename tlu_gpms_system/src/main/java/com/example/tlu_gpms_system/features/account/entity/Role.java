@@ -19,9 +19,9 @@ public class Role {
     String name;
     String description;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany
     @JoinTable(name = "role_permission",
-            joinColumns = @JoinColumn(name = "role_name"),
-            inverseJoinColumns = @JoinColumn(name = "permession_name"))
+            joinColumns = @JoinColumn(name = "role_name")
+            , inverseJoinColumns = @JoinColumn(name = "permession_name"))
     Set<Permission> permissions = new HashSet<>();
 }

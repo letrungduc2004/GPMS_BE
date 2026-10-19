@@ -1,11 +1,10 @@
 package com.example.tlu_gpms_system.features.account.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+// Không dùng @NotBlank/@Email ở đây: dữ liệu được kiểm tra bởi StudentRowValidator
+// để gom lỗi giống 1 dòng Excel (1 lỗi -> lỗi cụ thể, >= 2 lỗi -> thông báo chung)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,29 +12,12 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class StudentCreationRequest {
-
-    @NotBlank(message = "EMAIL_EMPTY")
-    @Email(message = "EMAIL_INVALID")
-    String email;
-
-    @NotBlank(message = "FIRST_NAME_EMPTY")
-    String firstName; // Họ
-
-    @NotBlank(message = "LAST_NAME_EMPTY")
-    String lastName; // Tên
-
-    @NotBlank(message = "PHONE_EMPTY")
-    String phone;
-
-    @NotBlank(message = "STUDENT_CODE_EMPTY")
     String studentCode;
-
-    @NotBlank(message = "BATCH_EMPTY")
+    String firstName; // Họ và tên đệm
+    String lastName; // Tên
+    String email;
+    String phone;
     String batch; // Khóa
-
-    @NotBlank(message = "CLASS_NAME_EMPTY")
     String className; // Tên lớp
-
-    @NotNull(message = "MAJOR_ID_NULL")
-    Long majorId;
+    String major; // Mã ngành hoặc tên ngành
 }

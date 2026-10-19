@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +18,10 @@ import java.util.UUID;
 public interface TeacherRepository extends JpaRepository<Teacher, Long> {
 
     Optional<Teacher> findByPublicId(UUID publicId);
+
+    // Dùng khi import: lấy 1 lần toàn bộ hồ sơ giáo viên theo account (tránh N+1)
+    @Query("SELECT t FROM Teacher t JOIN FETCH t.account JOIN FETCH t.major WHERE t.account.id IN :accountIds")
+    List<Teacher> findAllByAccountIdIn(@Param("accountIds") Collection<Long> accountIds);
 
     @Query(value = """
         SELECT new com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse(
