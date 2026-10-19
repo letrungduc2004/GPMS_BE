@@ -52,4 +52,16 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
         @Param("majorName") String majorName,
         Pageable pageable
     );
+
+    @Query("SELECT COUNT(s) FROM Student s WHERE s.major = :major")
+    long countByMajor(@Param("major") com.example.tlu_gpms_system.features.faculty.entity.Major major);
+
+    @Query("SELECT COUNT(s) FROM Student s WHERE s.major.faculty = :faculty")
+    long countByMajorFaculty(@Param("faculty") com.example.tlu_gpms_system.features.faculty.entity.Faculty faculty);
+
+    @Query("SELECT COUNT(s) FROM Student s JOIN s.account a WHERE s.major.faculty = :faculty AND s.status = true AND a.status = true")
+    long countActiveStudentsByFaculty(@Param("faculty") com.example.tlu_gpms_system.features.faculty.entity.Faculty faculty);
+
+    @Query("SELECT COUNT(s) FROM Student s JOIN s.account a WHERE s.major = :major AND s.status = true AND a.status = true")
+    long countActiveStudentsByMajor(@Param("major") com.example.tlu_gpms_system.features.faculty.entity.Major major);
 }

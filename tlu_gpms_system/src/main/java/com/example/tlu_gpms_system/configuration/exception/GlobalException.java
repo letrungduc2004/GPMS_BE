@@ -40,7 +40,12 @@ public class GlobalException {
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
     public ResponseEntity<APIResponse> methodArgument(MethodArgumentNotValidException exception) {
         String keyException = exception.getFieldError().getDefaultMessage();
-        ErrorCode errorCode = ErrorCode.valueOf(keyException);
+        ErrorCode errorCode;
+        try {
+            errorCode = ErrorCode.valueOf(keyException);
+        } catch (Exception e) {
+            errorCode = ErrorCode.INVALID_REQUEST;
+        }
         APIResponse response = APIResponse.builder()
                 .code(errorCode.getCode())
                 .message(errorCode.getMessage())

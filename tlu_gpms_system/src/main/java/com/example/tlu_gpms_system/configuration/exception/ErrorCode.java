@@ -48,10 +48,37 @@ public enum ErrorCode {
     CLASS_NAME_EMPTY(4000, "Tên lớp không được để trống", HttpStatus.BAD_REQUEST),
     MAJOR_ID_NULL(4000, "Ngành học không được để trống", HttpStatus.BAD_REQUEST),
 
+    // SEMESTER
+    SEMESTER_NAME_EMPTY(4000, "Tên học kỳ không được để trống", HttpStatus.BAD_REQUEST),
+    SEMESTER_START_DATE_NULL(4000, "Ngày bắt đầu không được để trống", HttpStatus.BAD_REQUEST),
+    SEMESTER_END_DATE_NULL(4000, "Ngày kết thúc không được để trống", HttpStatus.BAD_REQUEST),
+
+    // FACULTY & MAJOR FIELD VALIDATION
+    FACULTY_CODE_EMPTY(4000, "Mã khoa không được để trống", HttpStatus.BAD_REQUEST),
+    FACULTY_NAME_EMPTY(4000, "Tên khoa không được để trống", HttpStatus.BAD_REQUEST),
+    FACULTY_STATUS_NULL(4000, "Trạng thái khoa không được để trống", HttpStatus.BAD_REQUEST),
+    MAJOR_NAME_EMPTY(4000, "Tên ngành không được để trống", HttpStatus.BAD_REQUEST),
+    MAJOR_STATUS_NULL(4000, "Trạng thái ngành không được để trống", HttpStatus.BAD_REQUEST),
+
     // BUSINESS LOGIC
     EMAIL_EXIST(3001, "Email sinh viên đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
     STUDENT_CODE_EXIST(3002, "Mã sinh viên đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
     MAJOR_NOT_FOUND(3003, "Ngành học không tồn tại", HttpStatus.NOT_FOUND),
+    SEMESTER_NOT_FOUND(3004, "Học kỳ không tồn tại", HttpStatus.NOT_FOUND),
+    SEMESTER_NAME_EXIST(3005, "Tên học kỳ đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+    INVALID_SEMESTER_DATES(3006, "Ngày bắt đầu phải đứng trước ngày kết thúc", HttpStatus.BAD_REQUEST),
+    SEMESTER_HAS_RELATED_DATA(3007, "Không thể xóa học kỳ vì đã có dữ liệu liên quan (đồ án, đề tài, đợt đăng ký, hoặc hội đồng)", HttpStatus.BAD_REQUEST),
+
+    // FACULTY & MAJOR BUSINESS LOGIC
+    FACULTY_NOT_FOUND(3008, "Khoa không tồn tại", HttpStatus.NOT_FOUND),
+    FACULTY_CODE_EXIST(3009, "Mã khoa đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+    FACULTY_NAME_EXIST(3010, "Tên khoa đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
+    MAJOR_NAME_EXIST_IN_FACULTY(3011, "Tên ngành đã tồn tại trong cùng một khoa", HttpStatus.CONFLICT),
+    FACULTY_CANNOT_BE_DEACTIVATED(3012, "Không thể vô hiệu hóa khoa nếu vẫn còn ngành hoặc sinh viên/giảng viên đang hoạt động trong khoa đó", HttpStatus.BAD_REQUEST),
+    FACULTY_CANNOT_BE_DELETED(3013, "Không thể xóa khoa nếu vẫn còn ngành hoặc sinh viên/giảng viên đang hoạt động trong khoa đó", HttpStatus.BAD_REQUEST),
+    MAJOR_CANNOT_BE_DELETED(3014, "Không thể xóa ngành vì vẫn còn sinh viên hoặc giảng viên thuộc ngành này", HttpStatus.BAD_REQUEST),
+    HEAD_OF_DEPARTMENT_NOT_FOUND(3015, "Tài khoản Trưởng khoa không tồn tại", HttpStatus.NOT_FOUND),
+    ACCOUNT_NOT_HEAD_OF_DEPARTMENT(3016, "Tài khoản được chọn phải có vai trò Trưởng khoa (HEAD_OF_DEPARTMENT) và đang hoạt động", HttpStatus.BAD_REQUEST),
     ;
     private int code;
     private String message;

@@ -17,4 +17,8 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     @Query("select u from Account u " +
             "where u.id =:accountId and u.status = true ")
     Optional<Account> findByIdAndStatus(Long accountId);
+
+    @Query("SELECT DISTINCT a FROM Account a JOIN a.roles r " +
+            "WHERE r.name = 'HEAD_OF_DEPARTMENT' AND a.status = true")
+    java.util.List<Account> findActiveHeadOfDepartmentCandidates();
 }

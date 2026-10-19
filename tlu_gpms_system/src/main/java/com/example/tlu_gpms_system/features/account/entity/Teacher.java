@@ -1,5 +1,6 @@
 package com.example.tlu_gpms_system.features.account.entity;
 
+import com.example.tlu_gpms_system.features.faculty.entity.Major;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
