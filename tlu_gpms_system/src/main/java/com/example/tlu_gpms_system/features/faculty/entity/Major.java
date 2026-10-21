@@ -33,6 +33,7 @@ public class Major {
 
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
+    
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)

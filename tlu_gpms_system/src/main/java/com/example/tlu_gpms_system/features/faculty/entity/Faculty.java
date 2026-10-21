@@ -27,6 +27,7 @@ public class Faculty {
     Long id;
 
     // publicId dùng để truy xuất thông tin từ bên ngoài qua API
+
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     @Builder.Default
     UUID publicId = UuidCreator.getTimeOrderedEpoch();
