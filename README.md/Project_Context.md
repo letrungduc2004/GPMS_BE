@@ -48,13 +48,13 @@ Mục tiêu chính:
 ## Sinh viên
 Thực hiện đồ án và nộp hồ sơ.
 
-## Giáo viên hướng dẫn (GVHD)
+## Giáo viên hướng dẫn (Giáo viên hướng dẫn)
 Theo dõi và hướng dẫn sinh viên.
 
-## Giáo viên nhận xét (GVNX)
+## Giáo viên nhận xét (Giáo viên nhận xét)
 Đánh giá đề cương.
 
-## Giáo viên phản biện (GVPB)
+## Giáo viên phản biện (Giáo viên phản biện)
 Đánh giá phản biện đồ án.
 
 ## Chủ tịch hội đồng
@@ -63,7 +63,7 @@ Theo dõi và hướng dẫn sinh viên.
 ## Thư ký hội đồng
 Ghi biên bản và hỗ trợ hội đồng.
 
-## Trưởng bộ môn (TBM)
+## Trưởng bộ môn
 Quản lý toàn bộ quy trình đồ án.
 
 ## Admin
@@ -125,21 +125,20 @@ Lý do:
 
 1. Student
 2. Admin
-3. Head Of Department (TBM)
-4. Supervisor (GVHD)
-5. Reviewer (GVNX)
-6. Examiner (GVPB)
+3. Head Of Department (Trưởng bộ môn)
+4. Supervisor (Giáo viên hướng dẫn)
+5. Reviewer (Giáo viên nhận xét)
+6. Examiner (Giáo viên phản biện)
 7. Chairman
 8. Secretary
 
 Ghi chú:
 Một giảng viên có thể đảm nhận nhiều vai trò khác nhau tùy học kỳ.
 Ví dụ:
-- GVHD
-- GVPB
+- Giáo viên hướng dẫn
+- Giáo viên phản biện
 - Chủ tịch hội đồng
 đồng thời trong cùng một học kỳ.
-(Cần xác nhận chi tiết khi thiết kế RBAC.)
 
 ---
 
@@ -152,40 +151,41 @@ Một sinh viên chỉ thực hiện một đồ án.
 
 ## BR-02
 Một sinh viên chỉ đăng ký một giáo viên hướng dẫn.
-1 Sinh viên → 1 GVHD
+1 Sinh viên → 1 Giáo viên hướng dẫn
 
 ---
 
 ## BR-03
-Một đề tài thông thường có một GVHD.
-1 Đề tài → 1 GVHD
+Một đề tài thông thường có một Giáo viên hướng dẫn.
+1 Đề tài → 1 Giáo viên hướng dẫn
 
 ---
 
 ## BR-04
-Một số trường hợp đặc biệt có hai GVHD.
-1 Đề tài → 2 GVHD
+Một số trường hợp đặc biệt có hai Giáo viên hướng dẫn.
+1 Đề tài → 2 Giáo viên hướng dẫn
 
 Ví dụ:
-- GVHD chính
-- GVHD phụ
+- Giáo viên hướng dẫn chính
+- Giáo viên hướng dẫn phụ (Do trưởng bộ môn phân công)
 
 ---
 
 ## BR-05
 Giáo viên nhận xét phải khác giáo viên hướng dẫn.
-GVNX ≠ GVHD
+Giáo viên nhận xét ≠ Giáo viên hướng dẫn
 
 ---
 
 ## BR-06
 Giáo viên phản biện phải khác giáo viên hướng dẫn.
-GVPB ≠ GVHD
+Giáo viên phản biện ≠ Giáo viên hướng dẫn
 
 ---
 
 ## BR-07
-Điểm cuối cùng của sinh viên được tính bằng trung bình cộng điểm của 5 thành viên hội đồng.
+Điểm ra hội đồng sinh viên được tính bằng trung bình cộng điểm của 5 thành viên hội đồng.
+Điểm cuối cùng được tính bằng điểm giáo viên hướng dẫn, điểm 2 giáo viên phản biện, điểm của 5 thành viên hội đồng
 
 ---
 
@@ -196,23 +196,20 @@ Event-driven Notification
 ---
 
 ## BR-09
-TBM là người tạo đơn đổi lịch.
-
+Trưởng bộ môn là người tạo hội đồng và lịch bảo vệ và phân công giáo viên và các sinh viên vào hội đồng
+Một hội đồng tối đa 5 người (3 ủy viên, 1 thư ký, 1 chủ tịch)
 ---
 
 ## BR-10
-Chủ tịch hoặc Thư ký có quyền xử lý đổi lịch bảo vệ.
+Chủ tịch hoặc Thư ký có quyền đổi lịch bảo vệ.
 
 ---
 
 # 9. Các module nghiệp vụ đã xác định
 
-## Authentication
-
+## Account Management 
 - Đăng nhập
 - Đăng xuất
-
-## User Management
 - Quản lý tài khoản
 - Phân quyền
 - Trạng thái tài khoản
@@ -227,7 +224,7 @@ Chủ tịch hoặc Thư ký có quyền xử lý đổi lịch bảo vệ.
 - Quản lý giảng viên
 
 ## Registration Management
-- Đăng ký GVHD
+- Đăng ký Giáo viên hướng dẫn
 - Đăng ký đề tài
 
 ## Thesis Management
@@ -259,115 +256,88 @@ Chủ tịch hoặc Thư ký có quyền xử lý đổi lịch bảo vệ.
 ## Notification Management
 - Thông báo
 
-## Statistics Management
-- Thống kê
-- Báo cáo
-
 ---
 
 # 10. Workflow tổng thể đã hiểu
-Giai đoạn 1
-Đăng ký GVHD
+Giai đoạn 1: Đăng ký Giáo viên hướng dẫn
 Sinh viên
-→ Đăng ký GVHD
+→ Đăng ký Giáo viên hướng dẫn
 → Đăng ký đề tài
 Trương bộ môn
 → Phân công giáo viên hướng dẫn cho sinh viên (trường hợp chưa có giáo viên hướng dẫn)
 
-GVHD
+Giáo viên hướng dẫn
 → Duyệt/Từ chối
 
 ---
 
-Giai đoạn 2
-Đề cương
-Sinh viên
-→ Nộp đề cương
+Giai đoạn 2: Đề cương
+Trương bộ môn
+→ Phân công giáo viên nhận xét đề cương cho sinh viên (Giáo viên nhận xét không được là giáo viên hướng dẫn)
 
-GVNX
+Sinh viên
+→ Nộp đề cương (Có thể nộp nhiều lần nếu còn hạn)
+Giáo viên nhận xét
 → Nhận xét
 → Duyệt/Từ chối
 
 ---
 
-Giai đoạn 3
-Thực hiện đồ án
-
-GVHD
-→ Theo dõi tiến độ
+Giai đoạn 3: Thực hiện đồ án
+Giáo viên hướng dẫn
+→ Chấm điểm tiến trình từng tuần
 → Nộp phiếu theo dõi
-→ Chấm điểm tiến trình
 
 ---
 
-Giai đoạn 4
-Báo cáo
+Giai đoạn 4: Báo cáo
 Sinh viên
-→ Nộp báo cáo
-
-GVHD
+→ Nộp báo cáo (Có thể nộp nhiều lần nếu còn hạn)
+Giáo viên hướng dẫn
 → Kiểm tra
 → Check trùng lặp
 → Duyệt/Từ chối
 
 ---
 
-Giai đoạn 5
-Phản biện
+Giai đoạn 5: Phân công hội đồng
+Trưởng bộ môn 
+→ phân công giáo viên vào hội đồng (3 ủy viên, 1 chủ tịch, 1 thư kí)
+→ Gán sinh viên vào mỗi hội đồng
 
-GVPB
+Chủ tịch hoặc thư kí sau khi phân công
+→ Tạo lịch phản biện và phân công giáo viên phản biện cho sinh viên 
+(Giáo viên phản biện nằm trong hội đồng gồm thư kí và sinh viên phân công thuộc hội đồng bảo vệ mà trưởng bộ môn đã phân công)
+→ Đổi lịch bảo vệ 
+→ Tạo ca bảo vệ cho các sinh viên theo lịch
+---
+
+Giai đoạn 5: Phản biện
+Giáo viên phản biện
 → Đánh giá
 → Chấm điểm phản biện
 
 ---
 
-Giai đoạn 6
-Bảo vệ
-
-TBM
-→ Lập hội đồng
-→ Phân công
-
-Chủ tịch
-→ Lập lịch
-
-Thư ký
+Giai đoạn 6: Bảo vệ
+Thư kí
 → Ghi biên bản
 
 Thành viên hội đồng
 → Chấm điểm
 
 ---
-Giai đoạn 7
-Kết thúc
-
-TBM
+Giai đoạn 7: Kết thúc
+Trưởng bộ môn
 → Thống kê
 → Báo cáo
 
 ---
 
-# 11. Trạng thái hiện tại của dự án
 
-Hiện tại nhóm đang:
-- Thiết kế hệ thống.
-- Thiết kế ERD.
-
-Đây là giai đoạn quan trọng vì ảnh hưởng trực tiếp tới:
-- Database.
-- API.
-- Service.
-- Phân quyền.
-- Workflow.
-
----
-
-# 12. Những thông tin chưa được cung cấp
+# 11. Những thông tin chưa được cung cấp
 Các nội dung sau chưa được mô tả chi tiết:
 - Quy trình chi tiết của từng giai đoạn.
 - Biểu mẫu thực tế.
-- Quy định chi tiết về điểm số.
-- State machine của từng workflow.
-- Ràng buộc thời gian theo học kỳ.
 - Quy trình vận hành thực tế của từng vai trò.
 Các nội dung trên sẽ được bổ sung trong các cuộc trao đổi tiếp theo.

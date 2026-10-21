@@ -21,11 +21,11 @@ public class TeacherRowData {
     String phone;
     String organization;
     String major;
-    Long amount; // Chỉ có khi nhập thủ công. null -> gán mặc định theo email
+    String amount; // Chuỗi thô, chỉ có khi nhập thủ công. "" -> gán mặc định theo email
 
     // cells theo đúng thứ tự cột của file mẫu (xem TeacherColumn)
     public static TeacherRowData fromCells(int rowNumber, List<String> cells) {
-        return fromCells(rowNumber, cells, null);
+        return fromCells(rowNumber, cells, "");
     }
 
     public static TeacherRowData fromRequest(TeacherCreationRequest request) {
@@ -38,7 +38,7 @@ public class TeacherRowData {
                 nullToEmpty(request.getMajor())), request.getAmount());
     }
 
-    private static TeacherRowData fromCells(int rowNumber, List<String> cells, Long amount) {
+    private static TeacherRowData fromCells(int rowNumber, List<String> cells, String amount) {
         return TeacherRowData.builder()
                 .rowNumber(rowNumber)
                 .firstName(TextNormalizer.normalize(cells.get(0)))
@@ -47,7 +47,7 @@ public class TeacherRowData {
                 .phone(TextNormalizer.normalize(cells.get(3)))
                 .organization(TeacherOrganization.canonicalize(TextNormalizer.normalize(cells.get(4))))
                 .major(TextNormalizer.normalize(cells.get(5)))
-                .amount(amount)
+                .amount(TextNormalizer.normalize(amount))
                 .build();
     }
 

@@ -2,13 +2,13 @@ package com.example.tlu_gpms_system.features.account.controller;
 
 import com.example.tlu_gpms_system.common.dto.APIResponse;
 import com.example.tlu_gpms_system.common.enums.AccountStatusFilter;
-import com.example.tlu_gpms_system.common.enums.RowImportStatus;
 import com.example.tlu_gpms_system.configuration.exception.ErrorCode;
 import com.example.tlu_gpms_system.features.account.dto.request.StudentCreationRequest;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentCreationResult;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentImportResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentDetailResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentResponse;
+import com.example.tlu_gpms_system.features.account.dto.response.TeacherDetailResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import com.example.tlu_gpms_system.features.account.dto.request.TeacherAmountRequest;
 import com.example.tlu_gpms_system.features.account.dto.request.TeacherCreationRequest;
+import com.example.tlu_gpms_system.features.account.dto.response.TeacherCreationResult;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherImportResponse;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -81,7 +83,7 @@ public class UserController {
                 .build();
     }
 
-    // Cách 3: bấm nút Kích hoạt trên danh sách. Sinh viên đang hoạt động sẵn trả 200 với code 1100 để FE báo vàng
+    // Cách 3: bấm nút Kích hoạt tài khoản trên danh sách. Sinh viên đang hoạt động sẵn trả 200 với code 1100 để FE báo vàng
     @PatchMapping("/student/{publicId}/activate")
     public APIResponse<Void> activateStudent(@PathVariable(name = "publicId") String publicId) {
         if (!userService.activateStudent(publicId)) {
@@ -96,15 +98,29 @@ public class UserController {
                 .build();
     }
 
+
+//------------------------------------------------------TEACHER -----------------------------------------------
+
+
+    // Không đặt sort mặc định ở đây: không gửi sort thì Service tự sắp đang hoạt động trước, mới thêm trước
     @GetMapping("/teacher")
     public APIResponse<Page<TeacherResponse>> getAllTeacher(
-            @RequestParam(name = "lastName", required = false) String lastName,
-            @RequestParam(name = "organization", required = false) String organization,
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "organizationType", required = false) String organizationType,
             @RequestParam(name = "majorName", required = false) String majorName,
             @PageableDefault(size = 10) Pageable pageable) {
         return APIResponse.<Page<TeacherResponse>>builder()
                 .code(1000)
-                .data(userService.getAllTeachers(lastName, organization, majorName, pageable))
+                .data(userService.getAllTeachers(name, organizationType, majorName, pageable))
+                .build();
+    }
+
+    // Popup chi tiết khi bấm vào 1 dòng trên danh sách giáo viên
+    @GetMapping("/teacher/{publicId}")
+    public APIResponse<TeacherDetailResponse> getTeacherDetail(@PathVariable(name = "publicId") String publicId) {
+        return APIResponse.<TeacherDetailResponse>builder()
+                .code(1000)
+                .data(userService.getTeacherDetail(publicId))
                 .build();
     }
 
@@ -118,23 +134,18 @@ public class UserController {
                 .build();
     }
 
-    // Cách 2: nhập thủ công 1 giáo viên. TH4 (đang hoạt động) trả 200 với code 1100 để FE báo vàng
+    // Cách 2: nhập thủ công 1 giáo viên. Message tùy kết quả (thêm mới / kích hoạt lại / cập nhật field nào),
+    // TH4 (đang hoạt động) trả 200 với code 1100 để FE báo vàng
     @PostMapping("/teacher")
     public APIResponse<Void> createTeacher(@RequestBody TeacherCreationRequest request) {
-        RowImportStatus status = userService.createTeacher(request);
-        if (status == RowImportStatus.WARNING) {
-            return APIResponse.<Void>builder()
-                    .code(ErrorCode.TEACHER_ALREADY_ACTIVE.getCode())
-                    .message(ErrorCode.TEACHER_ALREADY_ACTIVE.getMessage())
-                    .build();
-        }
+        TeacherCreationResult result = userService.createTeacher(request);
         return APIResponse.<Void>builder()
-                .code(1000)
-                .message("Thêm giáo viên thành công")
+                .code(result.getCode())
+                .message(result.getMessage())
                 .build();
     }
 
-    // Cách 3: bấm nút Kích hoạt trên danh sách. Giáo viên đang hoạt động sẵn trả 200 với code 1100 để FE báo vàng
+    // Cách 3: bấm nút Kích hoạt tài khoản trên danh sách. Giáo viên đang hoạt động sẵn trả 200 với code 1100 để FE báo vàng
     @PatchMapping("/teacher/{publicId}/activate")
     public APIResponse<Void> activateTeacher(@PathVariable(name = "publicId") String publicId) {
         if (!userService.activateTeacher(publicId)) {
@@ -146,6 +157,17 @@ public class UserController {
         return APIResponse.<Void>builder()
                 .code(1000)
                 .message("Đã kích hoạt lại tài khoản giáo viên")
+                .build();
+    }
+
+    // Sửa số lượng sinh viên hướng dẫn của giáo viên đang hoạt động. Body: {"amount": 15}
+    @PatchMapping("/teacher/{publicId}/amount")
+    public APIResponse<Void> updateTeacherAmount(@PathVariable(name = "publicId") String publicId,
+                                                 @RequestBody TeacherAmountRequest request) {
+        userService.updateTeacherAmount(publicId, request);
+        return APIResponse.<Void>builder()
+                .code(1000)
+                .message("Cập nhật số lượng hướng dẫn thành công")
                 .build();
     }
 }

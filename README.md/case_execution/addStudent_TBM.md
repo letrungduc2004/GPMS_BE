@@ -14,13 +14,14 @@
 | 2 | Ngành phải thuộc quyền quản lý của Bộ môn hiện tại | Chỉ kiểm tra ngành **tồn tại trong DB**; Query 1 lấy **tất cả** `Major` | Chưa có quan hệ Bộ môn – Ngành – Trưởng bộ môn trong DB. Bổ sung sau |
 | 3 | Query 3 dùng `LOWER(a.email) IN :emails` | `a.email IN :emails` (không `LOWER`) | Email luôn được lưu dạng chữ thường; collation `*_ci` của MySQL đã không phân biệt hoa/thường; bọc `LOWER()` làm mất index |
 | 4 | Entity `Major` chỉ có `name` | Thêm cột `code` (unique, nullable) | Dùng làm key phụ cho `majorMap`; để nullable vì bảng `major` đã có dữ liệu cũ |
-| 5 | Nhập thủ công TH2/TH3 trả `400` hoặc `409` | Chốt **`409 Conflict`** (code `3004` / `3005`) | Theo yêu cầu nghiệp vụ |
+| 5 | Nhập thủ công TH2/TH3 trả `400` hoặc `409` | Chốt **`409 Conflict`**, code `3014` `ACCOUNT_DUPLICATED`, message liệt kê các trường trùng (thứ tự Mã sinh viên, Email, Số điện thoại) | Theo yêu cầu nghiệp vụ |
 | 6 | TH4 (nhập thủ công) trả "trạng thái cảnh báo" | **HTTP 200**, mã `11xx` (hiện là `1101`, xem #11) | Mã `2001` (ví dụ ban đầu) đã bị `FORBIDDEN` dùng |
 | 7 | `rowNumber` bắt đầu từ dòng dữ liệu | `rowNumber` = **số dòng thật trên Excel** (dòng tiêu đề = 1, dòng dữ liệu đầu tiên = 2) | FE/người dùng đối chiếu trực tiếp với file |
 | 8 | API cũ `POST /student` nhận danh sách (seed dữ liệu mẫu) | Đã **xóa**; `POST /student` giờ nhận **1 sinh viên** (Cách 2) | Theo yêu cầu nghiệp vụ |
 | 9 | Ô bị gộp trong "vùng dữ liệu" | Từ chối nếu vùng gộp bắt đầu trong **8 cột A–H**; gộp ở cột ngoài vùng (I trở đi) được bỏ qua | Làm rõ phạm vi "vùng dữ liệu" |
 | 10 | Kiểm tra trùng trong file trên mọi dòng | Chỉ đếm trùng trên các ô **đã qua bước Trống và Định dạng** của cột đó | Đảm bảo fail-fast: 1 ô không sinh 2 lỗi |
 | 11 | TH1/TH5 cùng báo "Thêm sinh viên thành công"; TH4 luôn báo vàng `1100`, không lưu | Message tách theo kết quả (Mục 6). Sinh viên đang hoạt động mà đổi lớp/SĐT thì **được cập nhật**; nhập y hệt thì báo vàng `1101`. Áp dụng cho **cả nhập thủ công và import Excel** (dòng thành công trong Excel cũng có message). `1100` giờ chỉ dùng cho Cách 3 | Báo "Thêm thành công" với sinh viên đã có là gây hiểu nhầm; TBM cần biết đã thêm mới, kích hoạt lại hay cập nhật field nào |
+| 12 | `phone` không kiểm tra trùng | **Mỗi SĐT chỉ thuộc về 1 tài khoản**: trùng trong file → `PHONE_DUPLICATED_IN_FILE`; SĐT đã thuộc tài khoản khác trong DB → `ACCOUNT_DUPLICATED` (`3014`, `409`), message có `Số điện thoại`. Dùng chung luật với thêm giáo viên (Mục 4.1, 4.2) | Theo yêu cầu nghiệp vụ. Cột `phone` trong DB **chưa** có `unique` vì dữ liệu cũ có thể đã trùng, luật chỉ được kiểm tra ở code |
 
 ---
 
@@ -56,7 +57,7 @@ public class Account {
     String lastName; // Tên
 
     @Column(name = "phone", nullable = false)
-    String phone; // Số điện thoại (KHÔNG unique, bắt buộc khác null)
+    String phone; // Số điện thoại (bắt buộc khác null; DB chưa đặt unique, luật không trùng kiểm tra ở code – Mục 0 #12)
 
     @Column(name = "status", nullable = false)
     Boolean status;
@@ -209,7 +210,7 @@ Quá trình kiểm tra mỗi dòng được chia làm **2 bước tuần tự**:
 | **`firstName`** | Không được để trống | Chỉ chứa chữ cái tiếng Việt, các từ cách nhau 1 khoảng trắng. Regex: `^\p{IsLatin}+( \p{IsLatin}+)*$` | *Không kiểm tra trùng* |
 | **`lastName`** | Không được để trống | Một từ, chỉ chứa chữ cái tiếng Việt. Regex: `^\p{IsLatin}+$` | *Không kiểm tra trùng* |
 | **`email`** | Không được để trống | Đúng định dạng email, regex (sau khi lowercase): `^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$`. Đúng định dạng rồi mới xét đuôi: **bắt buộc kết thúc bằng `@gmail.com`** (chỉ áp dụng cho sinh viên, giáo viên không áp dụng). VD `duc@gmail.com` hợp lệ; `duc@e.tlu.edu.vn`, `duc@sub.gmail.com`, `duc@gmail.com.vn` sai đuôi; `duc@gmail` sai định dạng | Không được trùng với dòng khác trong cùng file Excel (không phân biệt hoa/thường) |
-| **`phone`** | Không được để trống | SĐT Việt Nam: 10 chữ số, bắt đầu bằng `0`. Regex: `^0\d{9}$` | *Không kiểm tra trùng* |
+| **`phone`** | Không được để trống | SĐT Việt Nam: 10 chữ số, bắt đầu bằng `0`. Regex: `^0\d{9}$` | Không được trùng với dòng khác trong cùng file Excel |
 | **`batch`** | Không được để trống | Chữ `K` + 2 chữ số (VD: `K64`, `K65`). Regex (sau khi uppercase): `^K\d{2}$` | *Không kiểm tra trùng* |
 | **`className`** | Không được để trống | Chữ và số, các cụm cách nhau 1 khoảng trắng, không ký tự đặc biệt (VD: `64KTPM1`). Regex: `^[\p{L}\p{N}]+( [\p{L}\p{N}]+)*$` | *Không kiểm tra trùng* |
 | **`major`** | Không được để trống | Tên ngành hoặc mã ngành phải tồn tại trong DB (so khớp không phân biệt hoa/thường). *Chưa kiểm tra thuộc Bộ môn hiện tại, xem Mục 0 #2* | *Không kiểm tra trùng* |
@@ -224,16 +225,17 @@ Quá trình kiểm tra mỗi dòng được chia làm **2 bước tuần tự**:
 | `firstName` | `FIRST_NAME_EMPTY` – Họ không được để trống | `FIRST_NAME_INVALID` – Họ chỉ được chứa chữ cái và khoảng trắng | |
 | `lastName` | `LAST_NAME_EMPTY` – Tên không được để trống | `LAST_NAME_INVALID` – Tên chỉ được chứa chữ cái | |
 | `email` | `EMAIL_EMPTY` – Email không được để trống | `EMAIL_INVALID` – Email không đúng định dạng<br>`STUDENT_EMAIL_DOMAIN_INVALID` – Email sinh viên phải có đuôi @gmail.com | `EMAIL_DUPLICATED_IN_FILE` – Email bị trùng với dòng khác trong file |
-| `phone` | `PHONE_EMPTY` – Số điện thoại không được để trống | `PHONE_INVALID` – Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0 | |
+| `phone` | `PHONE_EMPTY` – Số điện thoại không được để trống | `PHONE_INVALID` – Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0 | `PHONE_DUPLICATED_IN_FILE` – Số điện thoại bị trùng với dòng khác trong file |
 | `batch` | `BATCH_EMPTY` – Khóa học không được để trống | `BATCH_INVALID` – Khóa học không đúng định dạng (VD: K64) | |
 | `className` | `CLASS_NAME_EMPTY` – Tên lớp không được để trống | `CLASS_NAME_INVALID` – Tên lớp không được chứa ký tự đặc biệt | |
 | `major` | `MAJOR_EMPTY` – Ngành học không được để trống | `MAJOR_INVALID` – Ngành học không tồn tại trong hệ thống | |
-| *(≥ 2 lỗi)* | `STUDENT_INFO_INVALID` – Thông tin nhập không hợp lệ, vui lòng kiểm tra lại | | |
+| *(≥ 2 lỗi)* | `ROW_INFO_INVALID` – `<các trường sai> không hợp lệ, vui lòng kiểm tra lại` (VD: Tên và Số điện thoại không hợp lệ, vui lòng kiểm tra lại) *(dùng chung với giáo viên)* | | |
 
 #### Lưu ý về Kiểm tra trùng trong nội bộ file Excel (Rule 2):
-* Chỉ kiểm tra trùng trên 2 cột là **`studentCode`** và **`email`**.
+* Chỉ kiểm tra trùng trên 3 cột là **`studentCode`**, **`email`** và **`phone`**.
 * Chỉ đếm trùng trên các ô **đã qua bước Trống và Định dạng** của cột đó. Ô đã có lỗi thì không tham gia đếm và không bị gắn thêm lỗi trùng.
-* Nếu phát hiện $\ge 2$ dòng trong cùng file Excel có cùng `studentCode` (hoặc cùng `email`), **tất cả các dòng bị trùng đó đều bị gắn lỗi** trùng tương ứng (không tự ý lấy dòng đầu tiên).
+* Nếu phát hiện $\ge 2$ dòng trong cùng file Excel có cùng `studentCode` (hoặc cùng `email`, cùng `phone`), **tất cả các dòng bị trùng đó đều bị gắn lỗi** trùng tương ứng (không tự ý lấy dòng đầu tiên).
+* Một dòng trùng cả email lẫn SĐT có 2 lỗi → gom thành `ROW_INFO_INVALID` theo quy tắc bên dưới: "Email và Số điện thoại không hợp lệ, vui lòng kiểm tra lại".
 
 #### Quy tắc Gom lỗi cuối Bước 1 (Error Aggregation Rule):
 Sau khi kiểm tra xong cả 8 cột của một dòng, gọi tập lỗi thu được là `rowErrors` (`EnumMap<StudentColumn, ErrorCode>`, mỗi cột tối đa 1 lỗi):
@@ -243,7 +245,8 @@ Sau khi kiểm tra xong cả 8 cột của một dòng, gọi tập lỗi thu đ
   * **Dừng xử lý dòng này** (Không chạy Bước 2).
 * Nếu `rowErrors.size() >= 2`:
   * Đánh dấu dòng là **`ERROR` (Báo Đỏ)**.
-  * Message trả về: `"Thông tin nhập không hợp lệ, vui lòng kiểm tra lại"`.
+  * Message trả về (`ROW_INFO_INVALID`): liệt kê **tất cả** các trường bị lỗi theo thứ tự cột của file mẫu (Mã sinh viên, Họ, Tên, Email, Số điện thoại, Khóa, Lớp, Ngành), ngăn cách bằng dấu phẩy, trường cuối nối bằng "và".
+  * VD: sai Tên và SĐT → `"Tên và Số điện thoại không hợp lệ, vui lòng kiểm tra lại"`; sai Tên, SĐT, Khóa → `"Tên, Số điện thoại và Khóa không hợp lệ, vui lòng kiểm tra lại"`.
   * **Dừng xử lý dòng này** (Không chạy Bước 2).
 * Nếu `rowErrors.isEmpty()` (0 lỗi):
   * Chuyển dòng này sang **Bước 2**.
@@ -255,42 +258,54 @@ Sau khi kiểm tra xong cả 8 cột của một dòng, gọi tập lỗi thu đ
 Với mỗi dòng đã vượt qua Bước 1, hệ thống thực hiện tra cứu từ Database:
 * `studentByCode`: Tìm `Student` theo `studentCode`.
 * `accountByEmail`: Tìm `Account` theo `email`.
+* `accountsByPhone`: Các `Account` đang giữ `phone` của dòng (dùng cho luật SĐT không trùng, xem cuối mục này).
 
-Hệ thống xử lý theo **5 trường hợp rẽ nhánh loại trừ nhau** dưới đây:
-
-#### Trường hợp 1: Sinh viên hoàn toàn mới (`studentByCode == null` VÀ `accountByEmail == null`)
-* **Kết quả:** Hợp lệ – Trạng thái **`SUCCESS`**.
-* **Hành động:**
-  1. Tạo mới đối tượng `Account` với `email`, `firstName`, `lastName`, `phone`, `status = true`, gán Role `STUDENT` (Role được load 1 lần, nếu không có thì ném `ROLE_NOT_EXIST`).
-  2. Tạo mới đối tượng `Student` với `studentCode`, `batch`, `className`, `major`, `status = true`, liên kết với `Account` vừa tạo.
-
-#### Trường hợp 2: Xung đột định danh / Trùng tài khoản khác
-Xảy ra khi:
-* `studentByCode == null` nhưng `accountByEmail != null` (Email đã thuộc về một SV khác hoặc Giảng viên/Admin).
-* **HOẶC** `studentByCode != null` nhưng `accountByEmail == null` (Mã SV đã tồn tại nhưng Email nhập vào không khớp).
-* **HOẶC** Cả hai khác `null` nhưng trỏ tới 2 tài khoản khác nhau: `!studentByCode.getAccount().getId().equals(accountByEmail.getId())`.
-* **Kết quả:** Lỗi – Trạng thái **`ERROR` (Báo Đỏ)**.
-* **Message trả về:** `"Email (hoặc Mã sinh viên) đã thuộc về một tài khoản khác trong hệ thống"` (`STUDENT_IDENTITY_CONFLICT`, code `3004`, HTTP `409`).
-* **Hành động:** Không lưu vào Database.
-
-#### Trường hợp 3: Trùng khớp cặp (`studentCode`, `email`) của 1 hồ sơ nhưng LỆCH thông tin gốc (Immutable Fields)
-Khi `studentByCode != null`, `accountByEmail != null` và `studentByCode.getAccount().getId().equals(accountByEmail.getId())`:
-Hệ thống kiểm tra đối chiếu **4 trường thông tin cứng (bất biến)** giữa file Excel và bản ghi trong Database:
+Đầu tiên hệ thống xác định dòng có phải **chính sinh viên cũ quay lại** hay không: `studentByCode != null`, `accountByEmail != null`, `studentByCode.getAccount().getId().equals(accountByEmail.getId())` **VÀ** khớp đủ **4 trường thông tin cứng (bất biến)**:
 1. `Account.firstName` (chuẩn hóa giá trị trong DB rồi so khớp chính xác, **phân biệt hoa/thường**)
 2. `Account.lastName` (chuẩn hóa giá trị trong DB rồi so khớp chính xác, **phân biệt hoa/thường**)
 3. `Student.batch` (so sánh khớp chuỗi không phân biệt hoa/thường)
 4. `Student.major.id` (so sánh khớp ID ngành học)
 
-* Nếu **bất kỳ 1 trong 4 trường trên không khớp** với Database:
-  * **Kết quả:** Lỗi – Trạng thái **`ERROR` (Báo Đỏ)**.
-  * **Message trả về:** `"Thông tin không khớp với hồ sơ gốc trong hệ thống"` (`STUDENT_PROFILE_MISMATCH`, code `3005`, HTTP `409`).
-  * **Hành động:** Không lưu vào Database.
+* Đúng là sinh viên cũ → đi tiếp **TH4 / TH5**.
+* Không phải → đi **TH2** (có trường trùng) hoặc **TH1** (không trùng gì).
+
+#### Trường hợp 2: Trùng định danh với tài khoản đã có
+Gom các trường định danh của dòng đang trùng với tài khoản đã có trong DB, **theo thứ tự cố định**:
+1. `Mã sinh viên`: `studentByCode != null`.
+2. `Email`: `accountByEmail != null` (email của một SV khác, giáo viên, admin...).
+3. `Số điện thoại`: SĐT đã thuộc **bất kỳ** tài khoản nào (xem *Luật SĐT không trùng*), kể cả chính tài khoản trùng mã SV / email.
+
+Có ít nhất 1 trường trùng:
+* **Kết quả:** Lỗi – Trạng thái **`ERROR` (Báo Đỏ)**. Không lưu vào Database.
+* **ErrorCode:** `ACCOUNT_DUPLICATED`, code `3014`, HTTP `409`.
+* **Message:** `"<các trường trùng, cách nhau bởi dấu phẩy> trùng với tài khoản đã tồn tại trong hệ thống"`. Ví dụ:
+
+| Trường bị trùng | Message |
+|---|---|
+| Mã SV | Mã sinh viên trùng với tài khoản đã tồn tại trong hệ thống |
+| Email | Email trùng với tài khoản đã tồn tại trong hệ thống |
+| SĐT | Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| Mã SV + Email | Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống |
+| Mã SV + SĐT | Mã sinh viên, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| Email + SĐT | Email, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| Mã SV + Email + SĐT | Mã sinh viên, Email, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+
+* Đúng mã SV + email của cùng 1 hồ sơ nhưng lệch họ / tên / khóa / ngành cũng rơi vào đây, message `"Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống"` (thêm `Số điện thoại` nếu SĐT cũng đã có người giữ).
+
+#### Trường hợp 1: Sinh viên hoàn toàn mới (không trường nào trùng)
+* **Kết quả:** Hợp lệ – Trạng thái **`SUCCESS`**.
+* **Hành động:**
+  1. Tạo mới đối tượng `Account` với `email`, `firstName`, `lastName`, `phone`, `status = true`, gán Role `STUDENT` (Role được load 1 lần, nếu không có thì ném `ROLE_NOT_EXIST`).
+  2. Tạo mới đối tượng `Student` với `studentCode`, `batch`, `className`, `major`, `status = true`, liên kết với `Account` vừa tạo.
+
+#### Trường hợp 3: (đã gộp vào TH2)
+Trước đây TH3 báo `"Thông tin không khớp với hồ sơ gốc trong hệ thống"` (`STUDENT_PROFILE_MISMATCH` 3005). Nay báo theo TH2.
 
 #### Trường hợp 4: Khớp 100% hồ sơ gốc NHƯNG sinh viên đang hoạt động sẵn trong kì này
 Khi cả 6 trường cứng (`studentCode`, `email`, `firstName`, `lastName`, `batch`, `major`) đều khớp 100% với Database, hệ thống kiểm tra trạng thái `status`:
 * Nếu **`Account.status == true` VÀ `Student.status == true`**, so sánh lớp (không phân biệt hoa/thường) và SĐT với DB. **Import Excel và nhập thủ công xử lý giống nhau:**
   * Không khác gì → **`WARNING` (Báo Vàng)**, `"Sinh viên đã có trong hệ thống, thông tin không thay đổi"` (`STUDENT_NO_CHANGE`, code `1101`), không lưu.
-  * Có khác → **`SUCCESS`**, cập nhật `Account.phone`, `Student.className`, message liệt kê field đã đổi (Mục 6).
+  * Có khác → kiểm tra *Luật SĐT không trùng*; qua thì **`SUCCESS`**, cập nhật `Account.phone`, `Student.className`, message liệt kê field đã đổi (Mục 6).
 
 #### Trường hợp 5: Khớp 100% hồ sơ gốc VÀ sinh viên cần được kích hoạt lại cho kì mới
 Khi cả 6 trường cứng (`studentCode`, `email`, `firstName`, `lastName`, `batch`, `major`) đều khớp 100% với Database, và **`Account.status == false` HOẶC `Student.status == false`**:
@@ -299,6 +314,16 @@ Khi cả 6 trường cứng (`studentCode`, `email`, `firstName`, `lastName`, `b
   1. Bật `Account.status = true`.
   2. Bật `Student.status = true`.
   3. **Cho phép cập nhật thông tin thay đổi theo kì:** Cập nhật `Account.phone = excelRow.phone` và `Student.className = excelRow.className`.
+* Trước khi lưu phải qua *Luật SĐT không trùng*.
+
+#### Luật SĐT không trùng (dùng chung với thêm giáo viên)
+Mỗi số điện thoại chỉ được thuộc về **1 tài khoản duy nhất**, tính trên **mọi** tài khoản: sinh viên, giáo viên, admin, trưởng bộ môn, kể cả tài khoản đã bị tắt.
+* Chỉ kiểm tra khi SĐT **sắp được ghi** vào DB: TH1/TH2, TH4 có thay đổi, TH5.
+* Không phải sinh viên cũ quay lại (TH1/TH2): SĐT đã thuộc bất kỳ tài khoản nào → thêm `Số điện thoại` vào danh sách trường trùng của TH2.
+* TH4 có thay đổi / TH5: SĐT thuộc một tài khoản **khác** với tài khoản của chính dòng đó → lỗi `"Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống"`. Giữ nguyên SĐT cũ của mình thì không lỗi.
+* TH4 y hệt (báo vàng `1101`) không kiểm tra, vì không ghi gì. Nhờ vậy dữ liệu cũ đã trùng SĐT từ trước khi có luật này không bị báo lỗi oan.
+* Lỗi: **`ERROR` (Báo Đỏ)**, `ACCOUNT_DUPLICATED`, code `3014`, HTTP `409`. Không lưu.
+* Danh sách tài khoản giữ SĐT được lấy **trước khi lưu** cả lô. Vì vậy trong cùng 1 file, nếu SV A đổi sang SĐT mới để "nhường" SĐT cũ cho SV B thì dòng B vẫn bị báo trùng SĐT. TBM import lại dòng B ở lần sau.
 
 ---
 
@@ -324,11 +349,17 @@ Tuyệt đối **KHÔNG** gọi lệnh truy vấn Database (`findByStudentCode`,
    ```
    Không dùng `LOWER(a.email)`, vì 2 lý do: email đã được lưu dạng chữ thường, và collation `*_ci` của MySQL vốn không phân biệt hoa/thường. Bọc `LOWER()` sẽ làm mất index của cột `email`. Khi đưa vào map, key được chuẩn hóa lại bằng `normalizeEmail()` cho chắc.
    Đưa kết quả vào `Map<String, Account> accountByEmailMap` để tra cứu với độ phức tạp $O(1)$.
-4. **Query 4 (Load Role):** `roleRepository.findById("STUDENT")`, chạy 1 lần duy nhất.
+4. **Query 4 (Load Accounts by Phone):**
+   Thu thập tất cả `phone` hợp lệ ở Bước 1 vào `Set<String> phones`. Thực hiện truy vấn:
+   ```sql
+   SELECT a FROM Account a WHERE a.phone IN :phones
+   ```
+   Gom kết quả vào `Map<String, List<Account>> accountsByPhone` (key là SĐT đã chuẩn hóa). Dùng `List` vì dữ liệu cũ có thể đã trùng SĐT giữa nhiều tài khoản.
+5. **Query 5 (Load Role):** `roleRepository.findById("STUDENT")`, chạy 1 lần duy nhất.
 
-> Query 2–4 **chỉ chạy khi có ít nhất 1 dòng qua được Bước 1**. Nếu mọi dòng đều lỗi định dạng, hệ thống chỉ tốn đúng 1 query (Query 1).
+> Query 2–5 **chỉ chạy khi có ít nhất 1 dòng qua được Bước 1**. Nếu mọi dòng đều lỗi định dạng, hệ thống chỉ tốn đúng 1 query (Query 1).
 >
-> Repository: `StudentRepository.findAllByStudentCodeIn(Collection<String>)` và `AccountRepository.findAllByEmailIn(Collection<String>)`.
+> Repository: `StudentRepository.findAllByStudentCodeIn(Collection<String>)`, `AccountRepository.findAllByEmailIn(Collection<String>)` và `AccountRepository.findAllByPhoneIn(Collection<String>)`.
 
 ### 5.2. Quản lý Transaction cho Partial Import (Rule 4)
 * Quá trình phân loại các dòng thành `accountsToSave`, `studentsToSave` và `rowResults` diễn ra hoàn toàn trên bộ nhớ (In-memory) mà không ném Exception làm đứt luồng.
@@ -336,7 +367,7 @@ Tuyệt đối **KHÔNG** gọi lệnh truy vấn Database (`findByStudentCode`,
   * Nếu danh sách hợp lệ (`accountsToSave`, `studentsToSave`) khác rỗng, thực hiện `accountRepository.saveAll(accountsToSave)` rồi `studentRepository.saveAll(studentsToSave)` trong cùng một Transaction (`@Transactional` trên method service).
   * TH5 (kích hoạt lại) sửa trực tiếp entity đã load, rồi cũng đưa vào 2 danh sách trên để lưu.
   * Trả về đối tượng Response chứa thống kê tổng quan và danh sách kết quả chi tiết của từng dòng cho Frontend.
-* **Hạn chế đã biết:** nếu 2 lần import chạy đồng thời cùng chèn một `studentCode`/`email`, vi phạm unique constraint sẽ rollback **toàn bộ lô** và trả `500`.
+* **Hạn chế đã biết:** nếu 2 lần import chạy đồng thời cùng chèn một `studentCode`/`email`, vi phạm unique constraint sẽ rollback **toàn bộ lô** và trả `500`. Với `phone` (chưa có unique ở DB), 2 lần import đồng thời cùng một SĐT có thể **cùng lưu thành công**, tạo ra SĐT trùng.
 
 ---
 
@@ -359,9 +390,15 @@ Ví dụ: DB có SV mã `2251172489`, email `duc@gmail.com`, khóa `K64`, lớp 
 | **TH5** bị tắt từ kì trước, y hệt – kích hoạt lại | Lớp `63KTPM1`, SĐT `0911111111` | `200` | `1000` | Đã kích hoạt lại tài khoản sinh viên |
 | **TH5** bị tắt từ kì trước, có thay đổi – kích hoạt lại + cập nhật | Lớp `64KTPM1`, SĐT `0987654321` | `200` | `1000` | Đã kích hoạt lại và cập nhật: Lớp, Số điện thoại |
 | Bước 1 có đúng 1 lỗi | | `400` | `4000` | Message của lỗi cụ thể (bảng ErrorCode Mục 4.1) |
-| Bước 1 có $\ge 2$ lỗi | | `400` | `4000` | Thông tin nhập không hợp lệ, vui lòng kiểm tra lại |
-| **TH2** (Mã SV và email chỉ vào 2 tài khoản khác nhau) | Mã `2251172489` + email `khac@gmail.com` | `409` | `3004` | Email (hoặc Mã sinh viên) đã thuộc về một tài khoản khác trong hệ thống |
-| **TH3** (Đúng mã + email nhưng lệch họ tên/khóa/ngành) | Khóa `K65` | `409` | `3005` | Thông tin không khớp với hồ sơ gốc trong hệ thống |
+| Bước 1 có $\ge 2$ lỗi | | `400` | `4000` | `<các trường sai> không hợp lệ, vui lòng kiểm tra lại` |
+| **TH2** (email đã thuộc tài khoản khác) | Mã mới + email của một giáo viên/SV khác | `409` | `3014` | Email trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (mã SV đã có, email chưa có trong DB) | Mã `2251172489` + email `khac@gmail.com` | `409` | `3014` | Mã sinh viên trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (mã SV và email đã có) | Mã `2251172489` + email của một SV khác | `409` | `3014` | Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (đúng mã + email nhưng lệch họ tên/khóa/ngành) | Khóa `K65` | `409` | `3014` | Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (mã SV + SĐT trùng) | Mã `2251172489` + email mới + SĐT của một tài khoản khác | `409` | `3014` | Mã sinh viên, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (email + SĐT trùng) | Mã mới + email và SĐT của một tài khoản khác | `409` | `3014` | Email, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH2** (mã SV + email + SĐT trùng) | Cả 3 đều đã có trong DB | `409` | `3014` | Mã sinh viên, Email, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
+| **TH1 / TH4 có thay đổi / TH5** nhưng SĐT đã thuộc tài khoản khác | SĐT `0911111111` cho một SV mới, hoặc SV Đức đổi sang SĐT của một giáo viên | `409` | `3014` | Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống |
 
 FE phân biệt Xanh / Vàng bằng `code` trong body (`1000` hoặc `1101`), vì cả hai đều trả HTTP `200`. Service trả `StudentCreationResult` (`code`, `message`), controller gói vào `APIResponse<Void>`.
 
@@ -502,7 +539,7 @@ Package gốc: `com.example.tlu_gpms_system`
 | `common/utils/text/TextNormalizer.java` | Chuẩn hóa chuỗi (Mục 3.3), `toLowerKey` / `toUpperKey` |
 | `common/utils/excel/ExcelUtils.java` | Dùng chung cho mọi chức năng import: mở file `.xlsx` (kiểm tra rỗng, đuôi, Magic bytes), phát hiện ô gộp, đọc dòng/ô dạng text (kể cả ô công thức) |
 | `common/utils/collection/DuplicateUtils.java` | Tìm vị trí tất cả phần tử có key bị lặp (dùng cho trùng trong file) |
-| `configuration/exception/GlobalException.java` | Bắt `MaxUploadSizeExceededException` → `FILE_TOO_LARGE`, `MissingServletRequestPartException` → `FILE_EMPTY`, `MethodArgumentTypeMismatchException` (tham số query sai kiểu) → `INVALID_REQUEST` |
+| `configuration/exception/GlobalException.java` | Bắt `MaxUploadSizeExceededException` → `FILE_TOO_LARGE`, `MissingServletRequestPartException` → `FILE_EMPTY`, `MethodArgumentTypeMismatchException` (tham số query sai kiểu), `HttpMessageNotReadableException` (body thiếu / JSON hỏng / field sai kiểu), `HttpMediaTypeNotSupportedException`, `MultipartException` → `INVALID_REQUEST` (400); `HttpRequestMethodNotSupportedException` → `OPERATION_NOT_ALLOWED` (405); `NoResourceFoundException` / `NoHandlerFoundException` → `RESOURCE_NOT_FOUND` (404) |
 | `features/account/service/helper/StudentColumn.java` | Enum 8 cột + tiêu đề hợp lệ |
 | `features/account/service/helper/StudentRowData.java` | Dữ liệu 1 dòng đã chuẩn hóa (từ Excel hoặc từ Form) |
 | `common/enums/RowImportStatus.java` | `SUCCESS` / `WARNING` / `ERROR` |
@@ -534,5 +571,7 @@ Package gốc: `com.example.tlu_gpms_system`
 * [ ] Lưu lịch sử tham gia theo học kì (hiện chỉ bật/tắt `status`).
 * [ ] Thêm `unique` cho `Major.name` và seed `Major.code`.
 * [ ] Migrate/xóa cột `className` cũ trong bảng `student` (Mục 2.3).
+* [ ] Dọn dữ liệu SĐT đang trùng giữa các tài khoản rồi thêm `unique` cho `Account.phone` (Mục 0 #12).
 * [ ] `GET /student` giai đoạn 2 (khi có module đề tài): thêm cột GVHD, Đề tài và bộ lọc "chưa có GVHD / chưa có đề tài" (JOIN chỉ đọc ở Repository).
-* [ ] `GET /teacher` còn ghép họ tên ngược (Tên + Họ) và chưa có whitelist sort, nên sửa theo cùng cách với `GET /student`.
+* [x] `GET /teacher` ghép họ tên đúng thứ tự Họ + Tên (đã sửa cùng lúc thêm `GET /teacher/{publicId}`, xem `addLecturer_TBM.md` Mục 8.1).
+* [x] `GET /teacher` có whitelist sort theo cùng cách với `GET /student` (dùng chung `toWhitelistedPageable`, xem `addLecturer_TBM.md` Mục 8.1).

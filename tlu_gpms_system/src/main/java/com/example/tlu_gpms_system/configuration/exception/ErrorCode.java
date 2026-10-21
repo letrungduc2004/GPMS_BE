@@ -52,7 +52,7 @@ public enum ErrorCode {
     MAJOR_ID_NULL(4000, "Ngành học không được để trống", HttpStatus.BAD_REQUEST),
     ORGANIZATION_EMPTY(4000, "Đơn vị công tác không được để trống", HttpStatus.BAD_REQUEST),
     AMOUNT_NULL(4000, "Số lượng sinh viên hướng dẫn không được để trống", HttpStatus.BAD_REQUEST),
-    AMOUNT_INVALID(4000, "Số lượng sinh viên hướng dẫn phải từ 1 đến 20", HttpStatus.BAD_REQUEST),
+    AMOUNT_INVALID(4000, "Số lượng sinh viên hướng dẫn phải là số nguyên không âm", HttpStatus.BAD_REQUEST),
 
     // BUSINESS LOGIC
     EMAIL_EXIST(3001, "Email đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
@@ -70,20 +70,22 @@ public enum ErrorCode {
     // STUDENT IMPORT - ROW (dùng chung cho import Excel và nhập thủ công)
     STUDENT_CODE_INVALID(4000, "Mã sinh viên phải gồm đúng 10 chữ số", HttpStatus.BAD_REQUEST),
     STUDENT_CODE_DUPLICATED_IN_FILE(4000, "Mã sinh viên bị trùng với dòng khác trong file", HttpStatus.BAD_REQUEST),
-    FIRST_NAME_INVALID(4000, "Họ chỉ được chứa chữ cái và khoảng trắng", HttpStatus.BAD_REQUEST),
+    FIRST_NAME_INVALID(4000, "Họ không được chứa số và kí tự đặc biệt", HttpStatus.BAD_REQUEST),
     LAST_NAME_INVALID(4000, "Tên chỉ được chứa chữ cái", HttpStatus.BAD_REQUEST),
     EMAIL_DUPLICATED_IN_FILE(4000, "Email bị trùng với dòng khác trong file", HttpStatus.BAD_REQUEST),
     PHONE_INVALID(4000, "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0", HttpStatus.BAD_REQUEST),
+    // Dùng chung cho import sinh viên và giáo viên
+    PHONE_DUPLICATED_IN_FILE(4000, "Số điện thoại bị trùng với dòng khác trong file", HttpStatus.BAD_REQUEST),
     BATCH_INVALID(4000, "Khóa học không đúng định dạng (VD: K64)", HttpStatus.BAD_REQUEST),
     CLASS_NAME_INVALID(4000, "Tên lớp không được chứa ký tự đặc biệt", HttpStatus.BAD_REQUEST),
     MAJOR_EMPTY(4000, "Ngành học không được để trống", HttpStatus.BAD_REQUEST),
     MAJOR_INVALID(4000, "Ngành học không tồn tại trong hệ thống", HttpStatus.BAD_REQUEST),
     STUDENT_EMAIL_DOMAIN_INVALID(4000, "Email sinh viên phải có đuôi @gmail.com", HttpStatus.BAD_REQUEST),
-    STUDENT_INFO_INVALID(4000, "Thông tin nhập không hợp lệ, vui lòng kiểm tra lại", HttpStatus.BAD_REQUEST),
+    // Dòng sai từ 2 trường trở lên (sinh viên và giáo viên). Message thực tế liệt kê các trường sai,
+    // VD "Tên và Số điện thoại không hợp lệ, vui lòng kiểm tra lại"; message dưới đây chỉ là mặc định
+    ROW_INFO_INVALID(4000, "Thông tin nhập không hợp lệ, vui lòng kiểm tra lại", HttpStatus.BAD_REQUEST),
 
     // STUDENT IMPORT - DATABASE
-    STUDENT_IDENTITY_CONFLICT(3004, "Email (hoặc Mã sinh viên) đã thuộc về một tài khoản khác trong hệ thống", HttpStatus.CONFLICT),
-    STUDENT_PROFILE_MISMATCH(3005, "Thông tin không khớp với hồ sơ gốc trong hệ thống", HttpStatus.CONFLICT),
     // Cảnh báo vàng: không phải lỗi, trả HTTP 200 kèm code riêng
     // Dùng khi bấm Kích hoạt (cách 3) trên sinh viên đang hoạt động sẵn
     STUDENT_ALREADY_ACTIVE(1100, "Sinh viên đã tồn tại/đang hoạt động trong kì này", HttpStatus.OK),
@@ -94,18 +96,24 @@ public enum ErrorCode {
     STUDENT_NOT_FOUND(3008, "Sinh viên không tồn tại", HttpStatus.NOT_FOUND),
 
     // TEACHER IMPORT - ROW (dùng chung cho import Excel và nhập thủ công)
-    ORGANIZATION_INVALID(4000, "Đơn vị công tác chỉ nhận Trong trường hoặc Ngoài trường", HttpStatus.BAD_REQUEST),
-    ORGANIZATION_NOT_MATCH_EMAIL(4000, "Đơn vị công tác không khớp với email (email @tlu.edu.vn là Trong trường, email khác là Ngoài trường)", HttpStatus.BAD_REQUEST),
-    TEACHER_INFO_INVALID(4000, "Thông tin nhập không hợp lệ, vui lòng kiểm tra lại", HttpStatus.BAD_REQUEST),
+    ORGANIZATION_INVALID(4000, "Đơn vị công tác chỉ gồm chữ, số, khoảng trắng và các dấu . , - & ( ) ' / (tối đa 255 ký tự)", HttpStatus.BAD_REQUEST),
+    TEACHER_EMAIL_DOMAIN_INVALID(4000, "Email giáo viên phải có đuôi @tlu.edu.vn (trong trường) hoặc @gmail.com (ngoài trường)", HttpStatus.BAD_REQUEST),
+    ORGANIZATION_NOT_MATCH_EMAIL(4000, "Đơn vị công tác không khớp với email (email @tlu.edu.vn phải là Trường Đại học Thủy lợi, email @gmail.com phải là trường khác)", HttpStatus.BAD_REQUEST),
+    MAJOR_NOT_ALLOWED(4000, "Giáo viên ngoài trường không được điền ngành", HttpStatus.BAD_REQUEST),
 
     // TEACHER IMPORT - DATABASE
-    TEACHER_IDENTITY_CONFLICT(3006, "Email đã thuộc về một tài khoản khác trong hệ thống", HttpStatus.CONFLICT),
-    TEACHER_PROFILE_MISMATCH(3007, "Thông tin không khớp với hồ sơ gốc trong hệ thống", HttpStatus.CONFLICT),
     // Cảnh báo vàng: không phải lỗi, trả HTTP 200 kèm code riêng. Dùng chung cho cả 3 cách thêm giáo viên
-    TEACHER_ALREADY_ACTIVE(1100, "Thông tin giáo viên đã có trong hệ thống", HttpStatus.OK),
+    TEACHER_ALREADY_ACTIVE(1100, "Giáo viên đã có trong hệ thống, thông tin không thay đổi", HttpStatus.OK),
 
     // TEACHER ACTIVATE (cách 3: kích hoạt từ danh sách)
     TEACHER_NOT_FOUND(3009, "Giáo viên không tồn tại", HttpStatus.NOT_FOUND),
+
+    // TEACHER UPDATE AMOUNT: chỉ sửa được giáo viên đang hoạt động
+    TEACHER_INACTIVE(3012, "Giáo viên không hoạt động trong kì này, không thể cập nhật số lượng hướng dẫn", HttpStatus.CONFLICT),
+
+    // IMPORT SINH VIÊN / GIÁO VIÊN - DATABASE: mã SV / email / SĐT trùng với tài khoản đã có.
+    // Message thực tế liệt kê các trường bị trùng, VD "Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống"
+    ACCOUNT_DUPLICATED(3014, "Thông tin trùng với tài khoản đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
     ;
     private int code;
     private String message;

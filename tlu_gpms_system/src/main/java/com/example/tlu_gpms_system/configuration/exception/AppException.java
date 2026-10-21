@@ -11,4 +11,10 @@ public class AppException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    // Message dựng động thay cho message cố định của ErrorCode (VD liệt kê các trường bị trùng)
+    public AppException(ErrorCode errorCode, String message) {
+        super(message);
+        this.errorCode = errorCode;
+    }
+
 }

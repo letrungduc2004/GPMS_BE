@@ -6,6 +6,7 @@ import com.example.tlu_gpms_system.common.utils.excel.DuplicateUtils;
 import com.example.tlu_gpms_system.common.utils.excel.TextNormalizer;
 import com.example.tlu_gpms_system.features.account.dto.request.StudentCreationRequest;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentCreationResult;
+import com.example.tlu_gpms_system.features.account.dto.response.TeacherCreationResult;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentImportResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentImportRowResult;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherImportResponse;
@@ -13,9 +14,11 @@ import com.example.tlu_gpms_system.features.account.dto.response.TeacherImportRo
 import com.example.tlu_gpms_system.features.account.entity.Role;
 import com.example.tlu_gpms_system.configuration.exception.AppException;
 import com.example.tlu_gpms_system.configuration.exception.ErrorCode;
+import com.example.tlu_gpms_system.features.account.dto.request.TeacherAmountRequest;
 import com.example.tlu_gpms_system.features.account.dto.request.TeacherCreationRequest;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentDetailResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.StudentResponse;
+import com.example.tlu_gpms_system.features.account.dto.response.TeacherDetailResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.entity.Account;
 import com.example.tlu_gpms_system.features.account.entity.Major;
@@ -51,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -74,6 +78,17 @@ public class UserServiceImpl implements UserService {
     // Chốt thêm s.id để phân trang ổn định khi nhiều dòng trùng giá trị sort (cùng lớp, cùng khóa...)
     private static final Sort.Order STUDENT_SORT_TIE_BREAKER = Sort.Order.desc("s.id");
 
+    // Whitelist sort cho danh sách giáo viên (alias t., a., m. trong TeacherRepository), cùng lý do như sinh viên.
+    // Chỉ gồm các cột có trên bảng danh sách; họ tên cũng sắp theo Tên rồi đến Họ
+    private static final Map<String, List<String>> TEACHER_SORT_FIELDS = Map.of(
+            "name", List.of("a.lastName", "a.firstName"),
+            "organization", List.of("t.organization"),
+            "majorName", List.of("m.name"),
+            "amount", List.of("t.amount"));
+    // Mặc định: giáo viên đang hoạt động lên trước, sau đó mới thêm lên trước
+    private static final Sort TEACHER_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "a.status", "t.id");
+    private static final Sort.Order TEACHER_SORT_TIE_BREAKER = Sort.Order.desc("t.id");
+
     private final StudentRepository studentRepository;
     private final TeacherRepository teacherRepository;
     private final AccountRepository accountRepository;
@@ -87,7 +102,7 @@ public class UserServiceImpl implements UserService {
         AccountStatusFilter statusFilter = status == null ? AccountStatusFilter.ACTIVE : status;
         return studentRepository.findAllStudents(blankToNull(TextNormalizer.normalize(keyword)),
                 blankToNull(TextNormalizer.toUpperKey(batch)), majorId, statusFilter.toActive(),
-                toStudentPageable(pageable));
+                toWhitelistedPageable(pageable, STUDENT_SORT_FIELDS, STUDENT_DEFAULT_SORT, STUDENT_SORT_TIE_BREAKER));
     }
 
     @Override
@@ -99,8 +114,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
-    public Page<TeacherResponse> getAllTeachers(String lastName, String organization, String majorName, Pageable pageable) {
-        return teacherRepository.findAllTeachers(lastName, organization, majorName, pageable);
+    public Page<TeacherResponse> getAllTeachers(String name, String organizationType, String majorName, Pageable pageable) {
+        TeacherOrganization type = TeacherOrganization.fromFilter(organizationType);
+        Boolean internal = type == null ? null : type == TeacherOrganization.INTERNAL;
+        return teacherRepository.findAllTeachers(blankToNull(TextNormalizer.normalize(name)),
+                internal, blankToNull(TextNormalizer.normalize(majorName)),
+                toWhitelistedPageable(pageable, TEACHER_SORT_FIELDS, TEACHER_DEFAULT_SORT, TEACHER_SORT_TIE_BREAKER));
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    public TeacherDetailResponse getTeacherDetail(String publicId) {
+        return teacherRepository.findTeacherDetail(parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND))
+                .orElseThrow(() -> new AppException(ErrorCode.TEACHER_NOT_FOUND));
     }
 
     @Override
@@ -129,7 +155,7 @@ public class UserServiceImpl implements UserService {
     public StudentCreationResult createStudent(StudentCreationRequest request) {
         RowOutcome outcome = processStudentRows(List.of(StudentRowData.fromRequest(request))).get(0);
         if (outcome.status() == RowImportStatus.ERROR) {
-            throw new AppException(outcome.error());
+            throw new AppException(outcome.error(), outcome.errorMessage());
         }
         if (outcome.status() == RowImportStatus.WARNING) {
             return new StudentCreationResult(outcome.error().getCode(), outcome.error().getMessage());
@@ -178,12 +204,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
-    public RowImportStatus createTeacher(TeacherCreationRequest request) {
+    public TeacherCreationResult createTeacher(TeacherCreationRequest request) {
         RowOutcome outcome = processTeacherRows(List.of(TeacherRowData.fromRequest(request))).get(0);
         if (outcome.status() == RowImportStatus.ERROR) {
-            throw new AppException(outcome.error());
+            throw new AppException(outcome.error(), outcome.errorMessage());
         }
-        return outcome.status();
+        if (outcome.status() == RowImportStatus.WARNING) {
+            return new TeacherCreationResult(outcome.error().getCode(), outcome.error().getMessage());
+        }
+        return new TeacherCreationResult(1000, teacherMessage(outcome));
     }
 
     @Override
@@ -199,11 +228,37 @@ public class UserServiceImpl implements UserService {
         }
         // Bật trạng thái và đặt lại số lượng hướng dẫn mặc định cho kì mới theo email (20 / 10).
         // Giữ nguyên SĐT, đơn vị, ngành và role. Muốn đổi thì dùng nhập thủ công (cách 2)
+        // Email cũ tạo trước khi có luật đuôi email (không phải @tlu.edu.vn / @gmail.com) coi là ngoài trường như luật cũ
+        TeacherOrganization organization = Objects.requireNonNullElse(
+                TeacherOrganization.ofEmail(TextNormalizer.toLowerKey(account.getEmail())), TeacherOrganization.EXTERNAL);
         account.setStatus(true);
-        teacher.setAmount(TeacherOrganization.ofEmail(TextNormalizer.toLowerKey(account.getEmail())).getDefaultAmount());
+        teacher.setAmount(organization.getDefaultAmount());
         accountRepository.save(account);
         teacherRepository.save(teacher);
         return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    public void updateTeacherAmount(String publicId, TeacherAmountRequest request) {
+        // Kiểm tra dữ liệu nhập trước, sai thì không truy vấn DB
+        String amount = TextNormalizer.normalize(request.getAmount());
+        if (amount.isEmpty()) {
+            throw new AppException(ErrorCode.AMOUNT_NULL);
+        }
+        if (!TeacherRowValidator.isValidAmount(amount)) {
+            throw new AppException(ErrorCode.AMOUNT_INVALID);
+        }
+        Teacher teacher = teacherRepository.findByPublicId(parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND))
+                .orElseThrow(() -> new AppException(ErrorCode.TEACHER_NOT_FOUND));
+        // Giáo viên bị tắt: kích hoạt lại sẽ đặt lại amount về mặc định, nên không cho sửa trước
+        if (!Boolean.TRUE.equals(teacher.getAccount().getStatus())) {
+            throw new AppException(ErrorCode.TEACHER_INACTIVE);
+        }
+        // Không chặn số mới bằng số cũ: vẫn lưu và báo thành công
+        teacher.setAmount(Long.valueOf(amount));
+        teacherRepository.save(teacher);
     }
 
     // Phân loại toàn bộ các dòng trên bộ nhớ, cuối cùng mới lưu các dòng hợp lệ
@@ -219,19 +274,24 @@ public class UserServiceImpl implements UserService {
                 ErrorCode.STUDENT_CODE_DUPLICATED_IN_FILE);
         markDuplicates(rows, rowErrors, StudentColumn.EMAIL, StudentRowData::getEmail,
                 ErrorCode.EMAIL_DUPLICATED_IN_FILE);
+        markDuplicates(rows, rowErrors, StudentColumn.PHONE, StudentRowData::getPhone,
+                ErrorCode.PHONE_DUPLICATED_IN_FILE);
 
         Set<String> studentCodes = new HashSet<>();
         Set<String> emails = new HashSet<>();
+        Set<String> phones = new HashSet<>();
         for (int i = 0; i < rows.size(); i++) {
             if (rowErrors.get(i).isEmpty()) {
                 studentCodes.add(rows.get(i).getStudentCode());
                 emails.add(rows.get(i).getEmail());
+                phones.add(rows.get(i).getPhone());
             }
         }
 
         // Bước 2: đối chiếu DB, chỉ query 1 lần cho cả file
         Map<String, Student> studentByCode = new HashMap<>();
         Map<String, Account> accountByEmail = new HashMap<>();
+        Map<String, List<Account>> accountsByPhone = new HashMap<>();
         Role studentRole = null;
         if (!studentCodes.isEmpty()) {
             // Query 2, Query 3
@@ -239,6 +299,8 @@ public class UserServiceImpl implements UserService {
                     .forEach(student -> studentByCode.put(student.getStudentCode(), student));
             accountRepository.findAllByEmailIn(emails)
                     .forEach(account -> accountByEmail.put(TextNormalizer.toLowerKey(account.getEmail()), account));
+            // Query 4: tài khoản đang giữ các SĐT trong file
+            accountsByPhone = groupAccountsByPhone(phones);
             studentRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.STUDENT.name())
                     .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
         }
@@ -250,14 +312,14 @@ public class UserServiceImpl implements UserService {
             StudentRowData row = rows.get(i);
             Map<StudentColumn, ErrorCode> errors = rowErrors.get(i);
             if (!errors.isEmpty()) {
-                outcomes.add(RowOutcome.error(aggregateErrors(errors, ErrorCode.STUDENT_INFO_INVALID)));
+                outcomes.add(rowError(errors, StudentColumn::getLabel));
                 continue;
             }
             Major major = majorMap.get(TextNormalizer.toLowerKey(row.getMajor()));
             outcomes.add(reconcileStudent(row, major,
                     studentByCode.get(row.getStudentCode()),
                     accountByEmail.get(row.getEmail()),
-                    studentRole, accountsToSave, studentsToSave));
+                    accountsByPhone, studentRole, accountsToSave, studentsToSave));
         }
 
         if (!accountsToSave.isEmpty()) {
@@ -268,10 +330,34 @@ public class UserServiceImpl implements UserService {
     }
 
     // 5 trường hợp loại trừ nhau khi đối chiếu với DB
-    private RowOutcome reconcileStudent(StudentRowData row, Major major, Student student, Account account, Role studentRole,
+    private RowOutcome reconcileStudent(StudentRowData row, Major major, Student student, Account account,
+                                        Map<String, List<Account>> accountsByPhone, Role studentRole,
                                         List<Account> accountsToSave, List<Student> studentsToSave) {
-        // TH1: sinh viên hoàn toàn mới
-        if (student == null && account == null) {
+        // Sinh viên cũ quay lại: mã SV và email thuộc cùng 1 tài khoản, khớp thông tin bất biến -> TH4 / TH5
+        boolean sameStudent = student != null && account != null
+                && student.getAccount().getId().equals(account.getId())
+                && TextNormalizer.normalize(account.getFirstName()).equals(row.getFirstName())
+                && TextNormalizer.normalize(account.getLastName()).equals(row.getLastName())
+                && TextNormalizer.normalize(student.getBatch()).equalsIgnoreCase(row.getBatch())
+                && student.getMajor().getId().equals(major.getId());
+
+        if (!sameStudent) {
+            // TH2, TH3: mã SV / email / SĐT trùng với tài khoản đã có -> báo đúng các trường bị trùng
+            List<String> duplicatedFields = new ArrayList<>();
+            if (student != null) {
+                duplicatedFields.add("Mã sinh viên");
+            }
+            if (account != null) {
+                duplicatedFields.add("Email");
+            }
+            if (isPhoneTakenByOther(row.getPhone(), null, accountsByPhone)) {
+                duplicatedFields.add("Số điện thoại");
+            }
+            if (!duplicatedFields.isEmpty()) {
+                return RowOutcome.duplicated(duplicatedFields);
+            }
+
+            // TH1: sinh viên hoàn toàn mới
             Account newAccount = Account.builder()
                     .email(row.getEmail())
                     .firstName(row.getFirstName())
@@ -293,20 +379,6 @@ public class UserServiceImpl implements UserService {
             return RowOutcome.SUCCESS;
         }
 
-        // TH2: mã SV / email thuộc về tài khoản khác
-        if (student == null || account == null || !student.getAccount().getId().equals(account.getId())) {
-            return RowOutcome.error(ErrorCode.STUDENT_IDENTITY_CONFLICT);
-        }
-
-        // TH3: đúng cặp (mã SV, email) nhưng lệch thông tin bất biến
-        boolean sameProfile = TextNormalizer.normalize(account.getFirstName()).equals(row.getFirstName())
-                && TextNormalizer.normalize(account.getLastName()).equals(row.getLastName())
-                && TextNormalizer.normalize(student.getBatch()).equalsIgnoreCase(row.getBatch())
-                && student.getMajor().getId().equals(major.getId());
-        if (!sameProfile) {
-            return RowOutcome.error(ErrorCode.STUDENT_PROFILE_MISMATCH);
-        }
-
         // Thông tin được phép thay đổi theo kì
         List<String> changedFields = new ArrayList<>();
         if (!TextNormalizer.normalize(student.getClassName()).equalsIgnoreCase(row.getClassName())) {
@@ -320,6 +392,10 @@ public class UserServiceImpl implements UserService {
         boolean active = Boolean.TRUE.equals(account.getStatus()) && Boolean.TRUE.equals(student.getStatus());
         if (active && changedFields.isEmpty()) {
             return RowOutcome.warning(ErrorCode.STUDENT_NO_CHANGE, null);
+        }
+        // SĐT sắp ghi vào tài khoản không được thuộc tài khoản khác
+        if (isPhoneTakenByOther(row.getPhone(), account, accountsByPhone)) {
+            return RowOutcome.duplicated(List.of("Số điện thoại"));
         }
 
         // TH5: kích hoạt lại cho kì mới (hoặc TH4 có thay đổi), cập nhật thông tin thay đổi theo kì
@@ -343,17 +419,22 @@ public class UserServiceImpl implements UserService {
                 .toList();
         markDuplicates(rows, rowErrors, TeacherColumn.EMAIL, TeacherRowData::getEmail,
                 ErrorCode.EMAIL_DUPLICATED_IN_FILE);
+        markDuplicates(rows, rowErrors, TeacherColumn.PHONE, TeacherRowData::getPhone,
+                ErrorCode.PHONE_DUPLICATED_IN_FILE);
 
         Set<String> emails = new HashSet<>();
+        Set<String> phones = new HashSet<>();
         for (int i = 0; i < rows.size(); i++) {
             if (rowErrors.get(i).isEmpty()) {
                 emails.add(rows.get(i).getEmail());
+                phones.add(rows.get(i).getPhone());
             }
         }
 
         // Bước 2: đối chiếu DB theo email, chỉ query 1 lần cho cả file
         Map<String, Account> accountByEmail = new HashMap<>();
         Map<Long, Teacher> teacherByAccountId = new HashMap<>();
+        Map<String, List<Account>> accountsByPhone = new HashMap<>();
         Role supervisorRole = null;
         if (!emails.isEmpty()) {
             // Query 2: tài khoản theo email
@@ -365,7 +446,9 @@ public class UserServiceImpl implements UserService {
                 teacherRepository.findAllByAccountIdIn(accountIds)
                         .forEach(teacher -> teacherByAccountId.put(teacher.getAccount().getId(), teacher));
             }
-            // Query 4: role gán cho giáo viên mới
+            // Query 4: tài khoản đang giữ các SĐT trong file
+            accountsByPhone = groupAccountsByPhone(phones);
+            // Query 5: role gán cho giáo viên mới
             supervisorRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.SUPERVISOR.name())
                     .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
         }
@@ -377,13 +460,14 @@ public class UserServiceImpl implements UserService {
             TeacherRowData row = rows.get(i);
             Map<TeacherColumn, ErrorCode> errors = rowErrors.get(i);
             if (!errors.isEmpty()) {
-                outcomes.add(RowOutcome.error(aggregateErrors(errors, ErrorCode.TEACHER_INFO_INVALID)));
+                outcomes.add(rowError(errors, TeacherColumn::getLabel));
                 continue;
             }
             Major major = majorMap.get(TextNormalizer.toLowerKey(row.getMajor()));
             Account account = accountByEmail.get(row.getEmail());
             Teacher teacher = account == null ? null : teacherByAccountId.get(account.getId());
-            outcomes.add(reconcileTeacher(row, major, account, teacher, supervisorRole, accountsToSave, teachersToSave));
+            outcomes.add(reconcileTeacher(row, major, account, teacher, accountsByPhone, supervisorRole,
+                    accountsToSave, teachersToSave));
         }
 
         if (!accountsToSave.isEmpty()) {
@@ -394,12 +478,30 @@ public class UserServiceImpl implements UserService {
     }
 
     // 5 trường hợp loại trừ nhau khi đối chiếu với DB
-    private RowOutcome reconcileTeacher(TeacherRowData row, Major major, Account account, Teacher teacher, Role supervisorRole,
+    private RowOutcome reconcileTeacher(TeacherRowData row, Major major, Account account, Teacher teacher,
+                                        Map<String, List<Account>> accountsByPhone, Role supervisorRole,
                                         List<Account> accountsToSave, List<Teacher> teachersToSave) {
         Long amount = resolveAmount(row);
 
-        // TH1: giáo viên hoàn toàn mới
-        if (account == null) {
+        // Giáo viên cũ quay lại: email thuộc 1 giáo viên, khớp thông tin bất biến (không phân biệt hoa/thường) -> TH4 / TH5
+        boolean sameTeacher = teacher != null
+                && TextNormalizer.normalize(account.getFirstName()).equalsIgnoreCase(row.getFirstName())
+                && TextNormalizer.normalize(account.getLastName()).equalsIgnoreCase(row.getLastName());
+
+        if (!sameTeacher) {
+            // TH2, TH3: email / SĐT trùng với tài khoản đã có -> báo đúng các trường bị trùng
+            List<String> duplicatedFields = new ArrayList<>();
+            if (account != null) {
+                duplicatedFields.add("Email");
+            }
+            if (isPhoneTakenByOther(row.getPhone(), null, accountsByPhone)) {
+                duplicatedFields.add("Số điện thoại");
+            }
+            if (!duplicatedFields.isEmpty()) {
+                return RowOutcome.duplicated(duplicatedFields);
+            }
+
+            // TH1: giáo viên hoàn toàn mới
             Account newAccount = Account.builder()
                     .email(row.getEmail())
                     .firstName(row.getFirstName())
@@ -419,21 +521,30 @@ public class UserServiceImpl implements UserService {
             return RowOutcome.success(amount);
         }
 
-        // TH2: email thuộc tài khoản không phải giáo viên (sinh viên, admin, ...)
-        if (teacher == null) {
-            return RowOutcome.error(ErrorCode.TEACHER_IDENTITY_CONFLICT);
-        }
-
-        // TH3: lệch thông tin bất biến (không phân biệt hoa/thường)
-        boolean sameProfile = TextNormalizer.normalize(account.getFirstName()).equalsIgnoreCase(row.getFirstName())
-                && TextNormalizer.normalize(account.getLastName()).equalsIgnoreCase(row.getLastName());
-        if (!sameProfile) {
-            return RowOutcome.error(ErrorCode.TEACHER_PROFILE_MISMATCH);
-        }
-
         // TH4: đang hoạt động sẵn trong kì này (gồm cả Trưởng bộ môn), không cập nhật gì
         if (Boolean.TRUE.equals(account.getStatus())) {
             return RowOutcome.warning(ErrorCode.TEACHER_ALREADY_ACTIVE, teacher.getAmount());
+        }
+        // SĐT sắp ghi vào tài khoản không được thuộc tài khoản khác
+        if (isPhoneTakenByOther(row.getPhone(), account, accountsByPhone)) {
+            return RowOutcome.duplicated(List.of("Số điện thoại"));
+        }
+
+        // Thông tin được phép thay đổi theo kì, ghi lại để báo cho TBM biết field nào bị ghi đè
+        List<String> changedFields = new ArrayList<>();
+        if (!TextNormalizer.normalize(account.getPhone()).equals(row.getPhone())) {
+            changedFields.add("Số điện thoại");
+        }
+        if (!TextNormalizer.normalize(teacher.getOrganization()).equalsIgnoreCase(row.getOrganization())) {
+            changedFields.add("Đơn vị công tác");
+        }
+        // Giáo viên ngoài trường không có ngành (major = null)
+        if (!Objects.equals(teacher.getMajor() == null ? null : teacher.getMajor().getId(),
+                major == null ? null : major.getId())) {
+            changedFields.add("Ngành");
+        }
+        if (!Objects.equals(teacher.getAmount(), amount)) {
+            changedFields.add("Số lượng hướng dẫn");
         }
 
         // TH5: kích hoạt lại cho kì mới, cập nhật thông tin thay đổi theo kì (role giữ nguyên)
@@ -444,19 +555,38 @@ public class UserServiceImpl implements UserService {
         teacher.setAmount(amount);
         accountsToSave.add(account);
         teachersToSave.add(teacher);
-        return RowOutcome.success(amount);
+        return RowOutcome.teacherReactivated(amount, changedFields);
     }
 
-    // Nhập thủ công có truyền amount thì dùng, ngược lại gán mặc định theo email (20 / 10)
+    // Nhập thủ công có truyền amount thì dùng, ngược lại gán mặc định theo email (20 / 10).
+    // amount đã qua TeacherRowValidator nên chắc chắn là số nguyên >= 0
     private Long resolveAmount(TeacherRowData row) {
-        return row.getAmount() != null
-                ? row.getAmount()
+        return !row.getAmount().isEmpty()
+                ? Long.valueOf(row.getAmount())
                 : TeacherOrganization.ofEmail(row.getEmail()).getDefaultAmount();
     }
 
-    // 1 lỗi -> lỗi cụ thể; >= 2 lỗi -> thông báo chung
-    private <C extends Enum<C>> ErrorCode aggregateErrors(Map<C, ErrorCode> errors, ErrorCode multipleErrors) {
-        return errors.size() == 1 ? errors.values().iterator().next() : multipleErrors;
+    // Key là SĐT đã chuẩn hóa. Dùng List vì dữ liệu cũ (trước khi có luật này) có thể đã trùng SĐT giữa nhiều tài khoản
+    private Map<String, List<Account>> groupAccountsByPhone(Set<String> phones) {
+        Map<String, List<Account>> accountsByPhone = new HashMap<>();
+        accountRepository.findAllByPhoneIn(phones).forEach(account -> accountsByPhone
+                .computeIfAbsent(TextNormalizer.normalize(account.getPhone()), key -> new ArrayList<>())
+                .add(account));
+        return accountsByPhone;
+    }
+
+    // SĐT bị tài khoản khác giữ (kể cả tài khoản đã tắt, khác role). owner = null khi tạo tài khoản mới
+    private boolean isPhoneTakenByOther(String phone, Account owner, Map<String, List<Account>> accountsByPhone) {
+        return accountsByPhone.getOrDefault(phone, List.of()).stream()
+                .anyMatch(account -> owner == null || !account.getId().equals(owner.getId()));
+    }
+
+    // 1 lỗi -> lỗi cụ thể; >= 2 lỗi -> liệt kê các trường sai theo thứ tự cột (errors là EnumMap)
+    private <C extends Enum<C>> RowOutcome rowError(Map<C, ErrorCode> errors, Function<C, String> label) {
+        if (errors.size() == 1) {
+            return RowOutcome.error(errors.values().iterator().next());
+        }
+        return RowOutcome.invalid(errors.keySet().stream().map(label).toList());
     }
 
     // Tất cả các dòng bị trùng đều bị gắn lỗi (không ưu tiên dòng đầu tiên).
@@ -496,24 +626,26 @@ public class UserServiceImpl implements UserService {
                 .className(row.getClassName())
                 .majorName(row.getMajor())
                 .status(outcome.status())
-                .message(outcome.error() == null ? studentMessage(outcome) : outcome.error().getMessage())
+                .message(outcome.error() == null ? studentMessage(outcome) : outcome.errorMessage())
                 .build();
     }
 
-    // Đổi sort FE gửi lên (studentCode, name...) sang đường dẫn JPQL; không gửi sort thì dùng thứ tự mặc định
-    private Pageable toStudentPageable(Pageable pageable) {
+    // Đổi sort FE gửi lên (name, majorName...) sang đường dẫn JPQL theo whitelist; không gửi sort thì dùng thứ tự mặc định.
+    // Dùng chung cho danh sách sinh viên và giáo viên
+    private Pageable toWhitelistedPageable(Pageable pageable, Map<String, List<String>> sortFields,
+                                           Sort defaultSort, Sort.Order tieBreaker) {
         if (pageable.getSort().isUnsorted()) {
-            return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), STUDENT_DEFAULT_SORT);
+            return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), defaultSort);
         }
         List<Sort.Order> orders = new ArrayList<>();
         for (Sort.Order order : pageable.getSort()) {
-            List<String> paths = STUDENT_SORT_FIELDS.get(order.getProperty());
+            List<String> paths = sortFields.get(order.getProperty());
             if (paths == null) {
                 throw new AppException(ErrorCode.INVALID_SORT_FIELD);
             }
             paths.forEach(path -> orders.add(new Sort.Order(order.getDirection(), path)));
         }
-        orders.add(STUDENT_SORT_TIE_BREAKER);
+        orders.add(tieBreaker);
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(orders));
     }
 
@@ -532,13 +664,23 @@ public class UserServiceImpl implements UserService {
 
     // Message cho dòng sinh viên lưu thành công: thêm mới / kích hoạt lại / cập nhật field nào
     private String studentMessage(RowOutcome outcome) {
-        String changes = String.join(", ", outcome.changedFields());
+        String changes = String.join(", ", outcome.fields());
         if (outcome.reactivated()) {
             return changes.isEmpty()
                     ? "Đã kích hoạt lại tài khoản sinh viên"
                     : "Đã kích hoạt lại và cập nhật: " + changes;
         }
         return changes.isEmpty() ? "Thêm sinh viên thành công" : "Đã cập nhật: " + changes;
+    }
+
+    // Message cho dòng giáo viên lưu thành công: thêm mới / kích hoạt lại / kích hoạt lại và cập nhật field nào
+    private String teacherMessage(RowOutcome outcome) {
+        if (!outcome.reactivated()) {
+            return "Thêm giáo viên thành công";
+        }
+        return outcome.fields().isEmpty()
+                ? "Đã kích hoạt lại tài khoản giáo viên"
+                : "Đã kích hoạt lại và cập nhật: " + String.join(", ", outcome.fields());
     }
 
     private TeacherImportRowResult toRowResult(TeacherRowData row, RowOutcome outcome) {
@@ -552,7 +694,7 @@ public class UserServiceImpl implements UserService {
                 .majorName(row.getMajor())
                 .amount(outcome.amount())
                 .status(outcome.status())
-                .message(outcome.error() == null ? null : outcome.error().getMessage())
+                .message(outcome.error() == null ? teacherMessage(outcome) : outcome.errorMessage())
                 .build();
     }
 
@@ -561,9 +703,10 @@ public class UserServiceImpl implements UserService {
     }
 
     // Kết quả xử lý 1 dòng. error là lỗi (ERROR) hoặc cảnh báo (WARNING); amount chỉ dùng cho giáo viên;
-    // reactivated, changedFields chỉ dùng để dựng message cho dòng sinh viên lưu thành công
+    // reactivated, fields dùng để dựng message: dòng lưu thành công -> các trường được cập nhật,
+    // lỗi ACCOUNT_DUPLICATED -> các trường trùng với tài khoản đã có, lỗi ROW_INFO_INVALID -> các trường nhập sai
     private record RowOutcome(RowImportStatus status, ErrorCode error, Long amount,
-                              boolean reactivated, List<String> changedFields) {
+                              boolean reactivated, List<String> fields) {
         static final RowOutcome SUCCESS = success(null);
 
         static RowOutcome success(Long amount) {
@@ -574,12 +717,35 @@ public class UserServiceImpl implements UserService {
             return new RowOutcome(RowImportStatus.SUCCESS, null, null, reactivated, changedFields);
         }
 
+        static RowOutcome teacherReactivated(Long amount, List<String> changedFields) {
+            return new RowOutcome(RowImportStatus.SUCCESS, null, amount, true, changedFields);
+        }
+
         static RowOutcome warning(ErrorCode warning, Long amount) {
             return new RowOutcome(RowImportStatus.WARNING, warning, amount, false, List.of());
         }
 
         static RowOutcome error(ErrorCode error) {
             return new RowOutcome(RowImportStatus.ERROR, error, null, false, List.of());
+        }
+
+        static RowOutcome invalid(List<String> invalidFields) {
+            return new RowOutcome(RowImportStatus.ERROR, ErrorCode.ROW_INFO_INVALID, null, false, invalidFields);
+        }
+
+        static RowOutcome duplicated(List<String> duplicatedFields) {
+            return new RowOutcome(RowImportStatus.ERROR, ErrorCode.ACCOUNT_DUPLICATED, null, false, duplicatedFields);
+        }
+
+        // Message của lỗi / cảnh báo, VD "Mã sinh viên, Email trùng với tài khoản đã tồn tại trong hệ thống",
+        // "Họ, Tên và Số điện thoại không hợp lệ, vui lòng kiểm tra lại"
+        String errorMessage() {
+            return switch (error) {
+                case ACCOUNT_DUPLICATED -> String.join(", ", fields) + " trùng với tài khoản đã tồn tại trong hệ thống";
+                case ROW_INFO_INVALID -> String.join(", ", fields.subList(0, fields.size() - 1))
+                        + " và " + fields.get(fields.size() - 1) + " không hợp lệ, vui lòng kiểm tra lại";
+                default -> error.getMessage();
+            };
         }
     }
 }

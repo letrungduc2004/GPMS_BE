@@ -45,3 +45,4 @@ public class Student {
     @JoinColumn(name = "account_id", nullable = false)
     Account account;
 }
+//

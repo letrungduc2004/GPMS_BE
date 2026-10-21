@@ -20,5 +20,5 @@ public class TeacherImportRowResult {
     String majorName;
     Long amount; // SUCCESS: giá trị vừa gán; WARNING: giá trị hiện có trong DB; ERROR: null
     RowImportStatus status; // SUCCESS | WARNING | ERROR
-    String message; // null nếu SUCCESS
+    String message; // SUCCESS: thêm mới / kích hoạt lại (kèm field cập nhật); WARNING, ERROR: nội dung cảnh báo / lỗi
 }

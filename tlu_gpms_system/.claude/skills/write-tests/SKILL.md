@@ -4,10 +4,17 @@ description: >-
   Sử dụng skill này khi user yêu cầu viết test cho một feature hoặc service trong GPMS.
   Ví dụ: "viết unit test cho TopicService", "test API endpoint", "tạo integration test",
   "write unit test", "test phân quyền API".
-  Skill hướng dẫn cách viết Unit Test (Mockito) và Integration Test (MockMvc) theo style hiện có của dự án.
+  Skill điều phối: unit test theo chuẩn UTC (skill unit-test-report-5-1),
+  integration test tự động bằng MockMvc (hướng dẫn ngay trong skill này).
 ---
 
 # Hướng dẫn viết Test cho TLU GPMS
+
+| Loại test | Theo skill |
+|---|---|
+| Unit test service/helper/util (Mockito, không Spring context) | **`unit-test-report-5-1`** — BẮT BUỘC chuẩn UTC (`@UnitTestCase`, không `@Nested`) |
+| Integration test tự động Controller (MockMvc, cần MySQL) | Mục **Integration Test** bên dưới |
+| Test case thủ công cho báo cáo 5.2 / SecurityTest / 5.3 | **`manual-test-report-5-2-5-3`** |
 
 > Mẫu tham khảo trong dự án:
 > - Unit test: `src/test/java/.../features/account/service/impl/UserServiceImplTest.java`
@@ -27,120 +34,11 @@ src/test/java/com/example/tlu_gpms_system/
 │           └── <Entity>ControllerIntegrationTest.java  # Integration Test
 ```
 
-## Unit Test - Service Layer
+Hạ tầng báo cáo unit test nằm ở `src/test/java/com/example/tlu_gpms_system/testreport/` (`UnitTestCase`, `UtcReportExtension`, `ReportXlsx`).
 
-### Template
-```java
-@ExtendWith(MockitoExtension.class)
-class <Entity>ServiceImplTest {
+## Unit Test
 
-    @Mock
-    private <Entity>Repository repository;
-
-    @Mock
-    private <Entity>Mapping mapping;
-
-    @InjectMocks
-    private <Entity>ServiceImpl service;
-
-    private <Entity> entity;
-    private <Entity>Request request;
-    private <Entity>Response response;
-    private UUID publicId;
-
-    @BeforeEach
-    void setUp() {
-        publicId = UUID.randomUUID();
-        // Khởi tạo test data ở đây (dùng builder của entity/DTO)
-    }
-
-    @Nested
-    @DisplayName("Tạo mới")
-    class CreateTests {
-        @Test
-        @DisplayName("Tạo thành công khi dữ liệu hợp lệ")
-        void create_success() {
-            // Given: create() trả void nên chỉ stub những gì service thực sự gọi
-            when(mapping.toEntity(request)).thenReturn(entity);
-
-            // When
-            service.create(request);
-
-            // Then
-            verify(repository).save(entity);
-        }
-
-        @Test
-        @DisplayName("Lưu đúng dữ liệu xuống repository")
-        void create_success_savedEntityHasCorrectData() {
-            when(mapping.toEntity(request)).thenReturn(entity);
-
-            service.create(request);
-
-            ArgumentCaptor<<Entity>> captor = ArgumentCaptor.forClass(<Entity>.class);
-            verify(repository).save(captor.capture());
-            assertThat(captor.getValue().getPublicId()).isNotNull();
-        }
-    }
-
-    @Nested
-    @DisplayName("Tìm theo publicId")
-    class GetByPublicIdTests {
-        @Test
-        @DisplayName("Tìm thành công khi publicId tồn tại")
-        void getByPublicId_success() {
-            when(repository.findByPublicId(publicId)).thenReturn(Optional.of(entity));
-            when(mapping.toResponse(entity)).thenReturn(response);
-
-            var result = service.getByPublicId(publicId);
-
-            assertThat(result).isEqualTo(response);
-        }
-
-        @Test
-        @DisplayName("Ném lỗi khi publicId không tồn tại")
-        void getByPublicId_notFound_throwException() {
-            when(repository.findByPublicId(publicId)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.getByPublicId(publicId))
-                    .isInstanceOf(AppException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ErrorCode.<ENTITY>_NOT_FOUND);
-
-            verify(mapping, never()).toResponse(any());
-        }
-    }
-}
-```
-
-### Quy tắc Unit Test
-1. **Naming**: theo style hiện có `method_condition_expected`, ví dụ `getAllStudents_success`, `createTeachers_emailExist_throwException`
-2. **Structure**: Given → When → Then (AAA pattern)
-3. **Dùng `@Nested`** để nhóm test theo method, **`@DisplayName`** bằng tiếng Việt
-4. **Assert bằng AssertJ**: `assertThat`, `assertThatThrownBy(...).extracting("errorCode").isEqualTo(ErrorCode.X)` — luôn kiểm tra đúng `ErrorCode`, không chỉ kiểm tra loại exception
-5. **Mock tất cả dependency**, chỉ test logic trong service. Chỉ stub những gì method thực sự gọi (Mockito strict stubs sẽ báo `UnnecessaryStubbingException` nếu thừa)
-6. **Method trả `void`**: không gán kết quả, kiểm tra bằng `verify(...)` và `ArgumentCaptor`
-7. **Verify side effects**: `verify(repository).save(...)`, `verify(notificationService).pushNotification(...)`, và `verify(repository, never()).save(any())` cho nhánh lỗi
-8. **Service gọi `authenticationService.getAccountInfo()`**: mock `AuthenticationService` và stub trả về `Account` test
-9. **Phân quyền**: `@PreAuthorize` / `@PostAuthorize` ở ServiceImpl **KHÔNG được kích hoạt** trong unit test Mockito (không có Spring context). Muốn test phân quyền → viết integration test bên dưới
-10. **Test import Excel**: tạo file bằng `XSSFWorkbook` rồi bọc trong `MockMultipartFile`:
-    ```java
-    private MockMultipartFile buildExcel(String[]... rows) throws IOException {
-        try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Sheet sheet = wb.createSheet();
-            for (int i = 0; i < rows.length; i++) {
-                Row row = sheet.createRow(i);
-                for (int j = 0; j < rows[i].length; j++) {
-                    row.createCell(j).setCellValue(rows[i][j]);
-                }
-            }
-            wb.write(out);
-            return new MockMultipartFile("file", "data.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", out.toByteArray());
-        }
-    }
-    ```
-11. **Test helper / common utils** (`service/helper`, `common/utils/excel`): là static method → gọi trực tiếp, không cần Mockito. Test đặt mirror package, ví dụ `src/test/java/.../common/utils/excel/TextNormalizerTest.java`. Riêng `ExcelUtils.openXlsx` ném `AppException` (`FILE_EMPTY`, `FILE_INVALID_FORMAT`) → kiểm tra bằng `assertThatThrownBy(...).extracting("errorCode")`
+Toàn bộ quy ước (thiết kế case Normal/Abnormal/Boundary, mã UTC, annotation, cách chạy theo round, xuất file mapping) nằm trong skill **`unit-test-report-5-1`**. Không viết unit test theo style `@Nested` / `method_condition_expected` cũ nữa.
 
 ## Integration Test - Controller Layer
 
@@ -222,12 +120,12 @@ class <Entity>ControllerIntegrationTest {
 4. Test cả happy path và error path
 
 ## Chạy test
-```bash
-# Một class
-.\mvnw.cmd test -Dtest=<Entity>ServiceImplTest
+```powershell
+# Unit test kèm file mapping báo cáo 5.1 (xem skill unit-test-report-5-1)
+.\mvnw.cmd test "-Dtest=<Entity>ServiceImplTest" "-Dutc.round=1" "-Dutc.tester=<Tên>" "-Dutc.outDir=../readme.md/test_report/Unit_Test_Report"
 
 # Một method
-.\mvnw.cmd test -Dtest=<Entity>ServiceImplTest#create_success
+.\mvnw.cmd test "-Dtest=<Entity>ServiceImplTest#UTC001_create_validRequest_saveEntity"
 
 # Toàn bộ
 .\mvnw.cmd test

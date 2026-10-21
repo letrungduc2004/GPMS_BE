@@ -26,14 +26,14 @@ public class Teacher {
     private UUID publicId = UuidCreator.getTimeOrderedEpoch();
 
     @Column(name = "organization", nullable = false)
-    String organization; // Đơn vị công tác
+    String organization; // Đơn vị công tác: tên trường (trong trường luôn là "Trường Đại học Thủy lợi")
 
     // Số lượng sinh viên tối đa hướng dẫn
     @Column(name = "amount", nullable = false)
     Long amount;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "major_id", nullable = false)
+    @JoinColumn(name = "major_id") // null với giáo viên ngoài trường
     Major major;
 
     @OneToOne(fetch = FetchType.LAZY)

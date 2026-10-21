@@ -14,14 +14,17 @@ public final class TeacherRowValidator {
 
     // Giới hạn của cột VARCHAR(255) trong DB, tránh lỗi SQL làm hỏng cả lô
     private static final int MAX_LENGTH = 255;
-    private static final long MIN_AMOUNT = 1L;
-    private static final long MAX_AMOUNT = 20L;
 
     // Chữ cái tiếng Việt (Latin, sau NFC) và khoảng trắng đơn
     private static final Pattern FIRST_NAME = Pattern.compile("^\\p{IsLatin}+( \\p{IsLatin}+)*$");
     private static final Pattern LAST_NAME = Pattern.compile("^\\p{IsLatin}+$");
     private static final Pattern EMAIL = Pattern.compile("^[a-z0-9._%+-]+@[a-z0-9-]+(\\.[a-z0-9-]+)*\\.[a-z]{2,}$");
     private static final Pattern PHONE = Pattern.compile("^0\\d{9}$");
+    // Tên trường: chữ cái tiếng Việt, chữ số, khoảng trắng đơn và các dấu câu . , - & ( ) ' /
+    private static final Pattern ORGANIZATION = Pattern.compile("^[\\p{IsLatin}\\d.,&()'/-]+( [\\p{IsLatin}\\d.,&()'/-]+)*$");
+    // Số nguyên >= 0, không làm tròn (5.5, 5.0, -1, "abc" đều lỗi). 0 hợp lệ (không nhận hướng dẫn, chỉ phản biện / hội đồng).
+    // Không đặt giới hạn trên theo nghiệp vụ; tối đa 18 chữ số chỉ để luôn nằm trong phạm vi Long
+    private static final Pattern AMOUNT = Pattern.compile("^\\d{1,18}$");
 
     private TeacherRowValidator() {
     }
@@ -36,31 +39,48 @@ public final class TeacherRowValidator {
                 ErrorCode.LAST_NAME_EMPTY, ErrorCode.LAST_NAME_INVALID);
         check(errors, TeacherColumn.EMAIL, row.getEmail(), EMAIL,
                 ErrorCode.EMAIL_EMPTY, ErrorCode.EMAIL_INVALID);
+        // Đúng định dạng rồi mới xét đuôi; email đã được chuẩn hóa về chữ thường
+        if (!errors.containsKey(TeacherColumn.EMAIL) && TeacherOrganization.ofEmail(row.getEmail()) == null) {
+            errors.put(TeacherColumn.EMAIL, ErrorCode.TEACHER_EMAIL_DOMAIN_INVALID);
+        }
         check(errors, TeacherColumn.PHONE, row.getPhone(), PHONE,
                 ErrorCode.PHONE_EMPTY, ErrorCode.PHONE_INVALID);
 
-        TeacherOrganization organization = TeacherOrganization.fromLabel(row.getOrganization());
-        if (row.getOrganization().isEmpty()) {
-            errors.put(TeacherColumn.ORGANIZATION, ErrorCode.ORGANIZATION_EMPTY);
-        } else if (organization == null) {
-            errors.put(TeacherColumn.ORGANIZATION, ErrorCode.ORGANIZATION_INVALID);
-        } else if (!errors.containsKey(TeacherColumn.EMAIL) && organization != TeacherOrganization.ofEmail(row.getEmail())) {
-            // Chỉ đối chiếu với email khi ô email đã hợp lệ
+        // Loại giáo viên chỉ xác định được khi ô email đã hợp lệ, ngược lại null
+        TeacherOrganization type = errors.containsKey(TeacherColumn.EMAIL) ? null : TeacherOrganization.ofEmail(row.getEmail());
+
+        check(errors, TeacherColumn.ORGANIZATION, row.getOrganization(), ORGANIZATION,
+                ErrorCode.ORGANIZATION_EMPTY, ErrorCode.ORGANIZATION_INVALID);
+        // Email trong trường bắt buộc là tên TLU; email ngoài trường không được ghi tên TLU
+        if (type != null && !errors.containsKey(TeacherColumn.ORGANIZATION)
+                && (type == TeacherOrganization.INTERNAL) != TeacherOrganization.isTluName(row.getOrganization())) {
             errors.put(TeacherColumn.ORGANIZATION, ErrorCode.ORGANIZATION_NOT_MATCH_EMAIL);
         }
 
-        if (row.getMajor().isEmpty()) {
-            errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_EMPTY);
+        // Giáo viên ngoài trường không có ngành; trong trường bắt buộc có.
+        // Email lỗi (chưa biết loại) thì bỏ qua ô trống, ô có giá trị vẫn kiểm tra danh mục
+        if (type == TeacherOrganization.EXTERNAL) {
+            if (!row.getMajor().isEmpty()) {
+                errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_NOT_ALLOWED);
+            }
+        } else if (row.getMajor().isEmpty()) {
+            if (type == TeacherOrganization.INTERNAL) {
+                errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_EMPTY);
+            }
         } else if (!majorMap.containsKey(TextNormalizer.toLowerKey(row.getMajor()))) {
             errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_INVALID);
         }
 
         // amount được bỏ trống (gán mặc định theo email)
-        Long amount = row.getAmount();
-        if (amount != null && (amount < MIN_AMOUNT || amount > MAX_AMOUNT)) {
+        if (!row.getAmount().isEmpty() && !isValidAmount(row.getAmount())) {
             errors.put(TeacherColumn.AMOUNT, ErrorCode.AMOUNT_INVALID);
         }
         return errors;
+    }
+
+    // Dùng chung cho nhập thủ công và API sửa số lượng hướng dẫn. value đã được chuẩn hóa (trim)
+    public static boolean isValidAmount(String value) {
+        return AMOUNT.matcher(value).matches();
     }
 
     // Ô bị lỗi công thức (#N/A, #REF!, ...) chứa ký tự '#' nên luôn rơi vào lỗi định dạng

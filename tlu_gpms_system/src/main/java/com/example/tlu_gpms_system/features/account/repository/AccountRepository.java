@@ -18,6 +18,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     @Query("SELECT a FROM Account a WHERE a.email IN :emails")
     List<Account> findAllByEmailIn(@Param("emails") Collection<String> emails);
 
+    // Dùng khi import: lấy 1 lần các tài khoản đang giữ số điện thoại trong file để chặn trùng SĐT giữa các tài khoản
+    @Query("SELECT a FROM Account a WHERE a.phone IN :phones")
+    List<Account> findAllByPhoneIn(@Param("phones") Collection<String> phones);
+
     @Query("select distinct u from Account u " +
             "left join fetch u.roles " +
             "where u.email =:email and u.status = true ")

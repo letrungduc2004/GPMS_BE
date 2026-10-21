@@ -16,7 +16,10 @@ public class TeacherCreationRequest {
     String lastName; // Tên
     String email;
     String phone;
-    String organization; // Đơn vị công tác: Trong trường | Ngoài trường
-    String major; // Mã ngành hoặc tên ngành
-    Long amount; // Số lượng sinh viên hướng dẫn tối đa (1-20). null -> gán mặc định theo email
+    String organization; // Đơn vị công tác: tên trường; email @tlu.edu.vn bắt buộc "Trường Đại học Thủy lợi"
+    String major; // Mã ngành hoặc tên ngành; giáo viên ngoài trường (@gmail.com) phải để trống
+    // Số lượng sinh viên hướng dẫn tối đa: số nguyên >= 0, không giới hạn trên. null / "" -> gán mặc định theo email.
+    // Nhận dạng chuỗi thô để TeacherRowValidator báo AMOUNT_INVALID cho 5.5, "abc"...
+    // (kiểu Long thì Jackson tự làm tròn 5.5 -> 5 và lỗi parse "abc" thành 400 / 1006 chung chung)
+    String amount;
 }

@@ -29,6 +29,8 @@ description: >-
 | `publicId` null / lỗi `Column 'public_id' cannot be null` | Entity tạo bằng `builder()` nhưng field `publicId` thiếu `@Builder.Default` | Thêm `@Builder.Default` trên `publicId` (và các collection có giá trị khởi tạo) |
 | `FILE_TOO_LARGE` khi import | File vượt giới hạn upload 50MB | Báo user giảm dung lượng file; không tự tăng giới hạn khi chưa hỏi |
 | `FILE_EMPTY` | Request multipart thiếu part `file` | Kiểm tra tên part FE gửi lên khớp `@RequestPart` |
+| `400` / `1006` "Yêu cầu không hợp lệ" | Body thiếu, JSON hỏng, field sai kiểu (object / mảng vào field chuỗi), sai `Content-Type`, multipart mất boundary, hoặc tham số query sai kiểu. Các handler này không ghi log | Kiểm tra body và header FE gửi; với `FormData` không tự đặt `Content-Type` |
+| `405` / `1007`, `404` / `1005` | Sai HTTP method; URL không khớp API nào (thừa / thiếu dấu `/`, sai đường dẫn) | So lại method và URL với Controller |
 | 500 khi gửi `sort` | Field trong `?sort=` không tồn tại trên entity/query (`PropertyReferenceException`) | Dùng đúng tên field; với DTO Projection chỉ sort theo field của entity gốc |
 | API chậm, log ra rất nhiều câu SELECT giống nhau | N+1 query do lazy relation bị truy cập trong vòng lặp | Dùng `JOIN FETCH ... IN :list` (mẫu `StudentRepository.findAllByStudentCodeIn`) hoặc DTO Projection |
 | Code `1100` trả về với HTTP 200 | Không phải lỗi: là cảnh báo nghiệp vụ (`STUDENT_ALREADY_ACTIVE`) | FE xử lý như cảnh báo |
@@ -37,7 +39,7 @@ description: >-
 
 ### 1. Lỗi 500 - Internal Server Error
 - [ ] Kiểm tra log console (`SYSTEM_ERROR` 1001 được log với nội dung "Bắt lỗi Controller Advice")
-- [ ] `GlobalException` đã bắt riêng: `AppException`, `MethodArgumentNotValidException`, `HandlerMethodValidationException`, `AccessDeniedException`, `MaxUploadSizeExceededException`, `MissingServletRequestPartException`; mọi exception khác rơi vào `SYSTEM_ERROR` (500) → tìm exception gốc trong log
+- [ ] `GlobalException` đã bắt riêng: `AppException`, `MethodArgumentNotValidException`, `HandlerMethodValidationException`, `AccessDeniedException`, `MaxUploadSizeExceededException`, `MissingServletRequestPartException`, `MethodArgumentTypeMismatchException`, `HttpMessageNotReadableException`, `HttpMediaTypeNotSupportedException`, `MultipartException`, `HttpRequestMethodNotSupportedException`, `NoResourceFoundException` / `NoHandlerFoundException`; mọi exception khác rơi vào `SYSTEM_ERROR` (500) → tìm exception gốc trong log
 - [ ] Nếu là `NullPointerException`: kiểm tra field nullable, relationship fetch type, `@Builder.Default`
 - [ ] Nếu là `LazyInitializationException`: xem mục 2
 

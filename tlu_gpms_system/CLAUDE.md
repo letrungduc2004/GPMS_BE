@@ -30,7 +30,9 @@ Do_An_Fall26/                      # git root
 | `create-feature-module` | Tạo feature/entity MỚI (đủ các layer) |
 | `api-crud-pattern` | Thêm CRUD API cho entity ĐÃ CÓ |
 | `api-request-template` | User mô tả yêu cầu API, cần chuẩn hóa đặc tả trước khi code |
-| `write-tests` | Viết unit test / integration test |
+| `write-tests` | Viết test nói chung (điều phối), integration test tự động MockMvc |
+| `unit-test-report-5-1` | Viết/chạy unit test theo chuẩn UTC, xuất file mapping báo cáo 5.1 |
+| `manual-test-report-5-2-5-3` | Soạn test case thủ công 5.2 Integration / SecurityTest / 5.3 System, ghi kết quả test tay |
 | `debug-and-fix` | Gặp lỗi, exception, bug |
 - Nội dung `.claude/` và `.agents/` phải giữ đồng bộ: sửa quy ước ở một bên thì cập nhật bên còn lại.
 
@@ -190,7 +192,7 @@ Trước khi viết hàm tiện ích mới, kiểm tra `common/` đã có chưa:
   + `1000` = Success; `1001–1007` = lỗi chung (`SYSTEM_ERROR`, `VALIDATION_FAIL`, `RESOURCE_NOT_FOUND`...)
   + `11xx` = cảnh báo nghiệp vụ, HTTP 200 (`STUDENT_ALREADY_ACTIVE` 1100)
   + `2xxx` = Security / Role / Permission (`UNAUTHORIZED` 2000, `FORBIDDEN` 2001...)
-  + `3xxx` = Business Logic (`EMAIL_EXIST` 3001 ... `STUDENT_PROFILE_MISMATCH` 3005) — lỗi nghiệp vụ mới lấy số tiếp theo, KHÔNG trùng số đã có
+  + `3xxx` = Business Logic (`EMAIL_EXIST` 3001 ... `ACCOUNT_DUPLICATED` 3014) — lỗi nghiệp vụ mới lấy số tiếp theo, KHÔNG trùng số đã có
   + `4000` = Field validation, lỗi file import và External Service (Mail, Cloudinary)
 - Lỗi không tìm thấy của entity mới: thêm `<ENTITY>_NOT_FOUND` (3xxx, `HttpStatus.NOT_FOUND`) thay vì dùng chung `RESOURCE_NOT_FOUND`
 - **Cơ chế Exception trong GlobalException**:
@@ -198,6 +200,8 @@ Trước khi viết hàm tiện ích mới, kiểm tra `common/` đã có chưa:
   + `AppException` → trả theo `errorCode`
   + `AccessDeniedException` → `FORBIDDEN` (2001, 403)
   + `MaxUploadSizeExceededException` → `FILE_TOO_LARGE`; `MissingServletRequestPartException` → `FILE_EMPTY`
+  + Lỗi request sai: `MethodArgumentTypeMismatchException`, `HttpMessageNotReadableException` (body thiếu / JSON hỏng / field sai kiểu), `HttpMediaTypeNotSupportedException`, `MultipartException` → `INVALID_REQUEST` (1006, 400)
+  + `HttpRequestMethodNotSupportedException` → `OPERATION_NOT_ALLOWED` (1007, 405); `NoResourceFoundException` / `NoHandlerFoundException` (URL không khớp API nào) → `RESOURCE_NOT_FOUND` (1005, 404)
   + `Exception` còn lại → `SYSTEM_ERROR` (1001, 500)
 
 ## Convention Security
@@ -224,10 +228,15 @@ STUDENT                — Sinh viên
 - Cần role mới → hỏi user, rồi thêm vào `Role.java` và `DB_UPDATE/DATA_ROLE_PERMISSION.txt`.
 
 ## Convention Testing
-- Chi tiết: xem skill `write-tests`
-- Unit Test cho Service layer (`@ExtendWith(MockitoExtension.class)`), dùng `@Nested`, `@DisplayName` tiếng Việt, AssertJ
+- Chi tiết: xem skill `write-tests` (điều phối), `unit-test-report-5-1`, `manual-test-report-5-2-5-3`
+- Unit Test (BẮT BUỘC chuẩn UTC): `@ExtendWith({MockitoExtension.class, UtcReportExtension.class})`, mỗi `@Test` gắn `@UnitTestCase` với mã `UTC###` riêng, KHÔNG dùng `@Nested`/`@ParameterizedTest`, assert bằng AssertJ
 - Integration Test cho Controller (`@SpringBootTest`, `@AutoConfigureMockMvc`) — cần MySQL đang chạy
 - Test class đặt trong `src/test/java` mirror cùng package
 - Naming class: `<ClassName>Test.java` cho unit test, `<ClassName>IntegrationTest.java` cho integration test
-- Naming method: `method_condition_expected` (ví dụ `createTeachers_emailExist_throwException`)
-- Chạy test: `.\mvnw.cmd test -Dtest=<ClassName>`
+- Naming method unit test: `UTC004_<method>_<tình huống>_<kết quả>` (ví dụ `UTC012_createTeachers_emailExist_throwAppException`)
+- Test fail là kết quả hợp lệ cho báo cáo: KHÔNG sửa assertion, thêm `@Disabled` hay sửa code production để test xanh khi user chưa đồng ý
+- Chạy test: `.\mvnw.cmd test "-Dtest=<ClassName>" "-Dutc.round=1" "-Dutc.tester=<Tên>" "-Dutc.outDir=../readme.md/test_report/Unit_Test_Report"`
+- Thư mục file Excel báo cáo test (ở git root `readme.md/test_report/`, từ `tlu_gpms_system/` là `../readme.md/test_report/`, có commit):
+  + 5.1 Unit Test: `Unit_Test_Report/` (mặc định trong `UtcReportExtension`, không cần truyền `-Dutc.outDir`)
+  + 5.2 Integration Test (kể cả sheet SecurityTest): `Integration_Test_Report/` (TSV + xlsx)
+  + 5.3 System Test: `System_Test_Report/` (TSV + xlsx)
