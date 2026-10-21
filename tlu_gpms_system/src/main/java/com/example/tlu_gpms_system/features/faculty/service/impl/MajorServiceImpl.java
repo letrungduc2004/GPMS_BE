@@ -23,7 +23,6 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class MajorServiceImpl implements MajorService {
 
     private final MajorRepository majorRepository;

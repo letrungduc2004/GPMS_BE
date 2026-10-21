@@ -38,8 +38,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
-@PreAuthorize("hasRole('ADMIN')")
 public class FacultyServiceImpl implements FacultyService {
 
     private final FacultyRepository facultyRepository;

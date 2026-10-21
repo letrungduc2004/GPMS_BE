@@ -25,6 +25,8 @@ import com.example.tlu_gpms_system.features.account.repository.AccountRepository
 import com.example.tlu_gpms_system.features.account.repository.RoleRepository;
 import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
 import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;
+import com.example.tlu_gpms_system.features.faculty.entity.Major;
+import com.example.tlu_gpms_system.features.faculty.repository.MajorRepository;
 import com.example.tlu_gpms_system.testreport.UnitTestCase;
 import com.example.tlu_gpms_system.testreport.UnitTestCase.Type;
 import com.example.tlu_gpms_system.testreport.UtcReportExtension;
