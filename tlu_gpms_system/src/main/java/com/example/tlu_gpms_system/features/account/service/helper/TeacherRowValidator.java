@@ -2,7 +2,7 @@ package com.example.tlu_gpms_system.features.account.service.helper;
 
 import com.example.tlu_gpms_system.common.utils.excel.TextNormalizer;
 import com.example.tlu_gpms_system.configuration.exception.ErrorCode;
-import com.example.tlu_gpms_system.features.account.entity.Major;
+import com.example.tlu_gpms_system.features.faculty.entity.Major;
 
 import java.util.EnumMap;
 import java.util.Map;

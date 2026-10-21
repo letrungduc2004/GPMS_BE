@@ -21,11 +21,9 @@ import com.example.tlu_gpms_system.features.account.dto.response.StudentResponse
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherDetailResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.entity.Account;
-import com.example.tlu_gpms_system.features.account.entity.Major;
 import com.example.tlu_gpms_system.features.account.entity.Student;
 import com.example.tlu_gpms_system.features.account.entity.Teacher;
 import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
-import com.example.tlu_gpms_system.features.account.repository.MajorRepository;
 import com.example.tlu_gpms_system.features.account.repository.RoleRepository;
 import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
 import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;
@@ -39,6 +37,8 @@ import com.example.tlu_gpms_system.features.account.service.helper.TeacherExcelR
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherOrganization;
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherRowData;
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherRowValidator;
+import com.example.tlu_gpms_system.features.faculty.entity.Major;
+import com.example.tlu_gpms_system.features.faculty.repository.MajorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

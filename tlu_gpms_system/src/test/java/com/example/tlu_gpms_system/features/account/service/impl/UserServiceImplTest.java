@@ -18,12 +18,10 @@ import com.example.tlu_gpms_system.features.account.dto.response.TeacherImportRe
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherImportRowResult;
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.entity.Account;
-import com.example.tlu_gpms_system.features.account.entity.Major;
 import com.example.tlu_gpms_system.features.account.entity.Role;
 import com.example.tlu_gpms_system.features.account.entity.Student;
 import com.example.tlu_gpms_system.features.account.entity.Teacher;
 import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
-import com.example.tlu_gpms_system.features.account.repository.MajorRepository;
 import com.example.tlu_gpms_system.features.account.repository.RoleRepository;
 import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
 import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;

@@ -4,6 +4,8 @@ import com.example.tlu_gpms_system.features.account.dto.response.TeacherDetailRe
 import com.example.tlu_gpms_system.features.account.dto.response.TeacherResponse;
 import com.example.tlu_gpms_system.features.account.entity.Teacher;
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherOrganization;
+import com.example.tlu_gpms_system.features.faculty.entity.Faculty;
+import com.example.tlu_gpms_system.features.faculty.entity.Major;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -77,4 +79,19 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
         WHERE t.publicId = :publicId
         """)
     Optional<TeacherDetailResponse> findTeacherDetail(@Param("publicId") UUID publicId);
+
+
+
+    //--------------------------------------Dương------------------------------------
+        @Query("SELECT COUNT(t) FROM Teacher t WHERE t.major = :major")
+        long countByMajor(@Param("major") Major major);
+
+        @Query("SELECT COUNT(t) FROM Teacher t WHERE t.major.faculty = :faculty")
+        long countByMajorFaculty(@Param("faculty") Faculty faculty);
+
+        @Query("SELECT COUNT(t) FROM Teacher t JOIN t.account a WHERE t.major.faculty = :faculty AND a.status = true")
+        long countActiveTeachersByFaculty(@Param("faculty") Faculty faculty);
+
+        @Query("SELECT COUNT(t) FROM Teacher t JOIN t.account a WHERE t.major = :major AND a.status = true")
+        long countActiveTeachersByMajor(@Param("major") Major major);
 }
