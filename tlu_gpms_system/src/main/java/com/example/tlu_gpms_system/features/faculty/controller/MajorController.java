@@ -12,12 +12,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping({"/api/v1/majors", "/api/v1/major", "/majors", "/major"})
 @RequiredArgsConstructor
 public class MajorController {
 
     private final MajorService majorService;
 
-    @GetMapping("/major")
+    @GetMapping
     public APIResponse<List<com.example.tlu_gpms_system.features.account.dto.response.MajorResponse>> getAllMajors() {
         return APIResponse.<List<com.example.tlu_gpms_system.features.account.dto.response.MajorResponse>>builder()
                 .code(1000)
