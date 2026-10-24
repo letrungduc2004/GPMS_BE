@@ -19,8 +19,6 @@ public class FacultyUpdateRequest {
     @NotBlank(message = "FACULTY_NAME_EMPTY")
     String name;
 
-    Long headOfDepartmentId;
-
     String description;
 
     @NotNull(message = "FACULTY_STATUS_NULL")

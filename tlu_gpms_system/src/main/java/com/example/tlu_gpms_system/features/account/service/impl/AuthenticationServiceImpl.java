@@ -95,6 +95,33 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .build();
     }
 
+    // Đăng nhập nhanh bằng email cho Postman (bỏ qua Google OAuth2)
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public LoginPostManResponse loginPostMan(String email) {
+        Account account = accountRepository.findByEmailAndStatus(email)
+                .orElseThrow(() -> new AppException(ErrorCode.ACCOUNT_INVALID));
+
+        Set<String> roles = account.getRoles() != null
+                ? account.getRoles().stream()
+                        .map(Role::getName)
+                        .collect(Collectors.toSet())
+                : Collections.emptySet();
+        StringBuilder builder = new StringBuilder();
+        if (account.getFirstName() != null) {
+            builder.append(account.getFirstName()).append(" ");
+        }
+        if (account.getLastName() != null) {
+            builder.append(account.getLastName());
+        }
+        return LoginPostManResponse.builder()
+                .token(createToken(account))
+                .authenticated(true)
+                .name(builder.toString().trim())
+                .role(roles)
+                .build();
+    }
+
     // Tạo Token: header: chứa thuật toán kí(HS256)
     // payload: chứa thông tin (người dùng, thời gian tạo - hạn token)
     // signature: chữ kí số tạo từ header + payload + secret key
@@ -249,7 +276,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public UserInfoResponse userInfo() {
         Account account = getAccountInfo();
         StringBuilder builder = new StringBuilder();

@@ -25,6 +25,8 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
     // Tham số rỗng đã được Service đổi về null; null nghĩa là không lọc theo điều kiện đó.
     // name tìm theo họ tên đầy đủ (Họ + Tên), nên gõ "Nguyễn", "An" hay "Nguyễn Văn An" đều ra.
     // internal: true = trong trường (đơn vị đúng tên Thủy lợi), false = ngoài trường (trường khác)
+    // allMajors = true (Admin): không lọc ngành; false: lấy giáo viên thuộc majorIds và giáo viên chưa có ngành
+    // (ngoài trường, dùng chung cho mọi Trưởng ngành)
     String TEACHER_LIST_FILTER = """
         FROM Teacher t
         JOIN t.account a
@@ -32,6 +34,7 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
         WHERE (:name IS NULL
                OR LOWER(CONCAT(COALESCE(a.firstName, ''), ' ', COALESCE(a.lastName, ''))) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:majorName IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', :majorName, '%')))
+          AND (:allMajors = true OR m.id IS NULL OR m.id IN :majorIds)
         """
         + "  AND (:internal IS NULL OR (CASE WHEN t.organization = '" + TeacherOrganization.TLU_NAME
         + "' THEN true ELSE false END) = :internal)\n";
@@ -59,6 +62,8 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
         @Param("name") String name,
         @Param("internal") Boolean internal,
         @Param("majorName") String majorName,
+        @Param("allMajors") boolean allMajors,
+        @Param("majorIds") Collection<Long> majorIds,
         Pageable pageable
     );
 
@@ -77,8 +82,11 @@ public interface TeacherRepository extends JpaRepository<Teacher, Long> {
         JOIN t.account a
         LEFT JOIN t.major m
         WHERE t.publicId = :publicId
+          AND (:allMajors = true OR m.id IS NULL OR m.id IN :majorIds)
         """)
-    Optional<TeacherDetailResponse> findTeacherDetail(@Param("publicId") UUID publicId);
+    Optional<TeacherDetailResponse> findTeacherDetail(@Param("publicId") UUID publicId,
+                                                      @Param("allMajors") boolean allMajors,
+                                                      @Param("majorIds") Collection<Long> majorIds);
 
 
 

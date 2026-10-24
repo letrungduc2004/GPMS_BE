@@ -25,25 +25,15 @@ public interface FacultyRepository extends JpaRepository<Faculty, Long> {
 
     boolean existsByNameAndIdNot(String name, Long id);
 
-    @Query(value = "SELECT f FROM Faculty f LEFT JOIN f.headOfDepartment h " +
+    @Query(value = "SELECT f FROM Faculty f " +
             "WHERE (:keyword IS NULL OR :keyword = '' OR " +
             "LOWER(f.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "(h IS NOT NULL AND (" +
-            "LOWER(h.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(h.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(CONCAT(h.lastName, ' ', h.firstName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(CONCAT(h.firstName, ' ', h.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%'))))) " +
+            "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
             "AND (:status IS NULL OR f.status = :status)",
-            countQuery = "SELECT COUNT(f) FROM Faculty f LEFT JOIN f.headOfDepartment h " +
+            countQuery = "SELECT COUNT(f) FROM Faculty f " +
             "WHERE (:keyword IS NULL OR :keyword = '' OR " +
             "LOWER(f.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "(h IS NOT NULL AND (" +
-            "LOWER(h.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(h.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(CONCAT(h.lastName, ' ', h.firstName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(CONCAT(h.firstName, ' ', h.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%'))))) " +
+            "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
             "AND (:status IS NULL OR f.status = :status)")
     Page<Faculty> findAllWithFilter(
             @Param("keyword") String keyword,

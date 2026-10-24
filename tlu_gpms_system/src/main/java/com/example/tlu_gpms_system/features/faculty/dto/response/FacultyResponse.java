@@ -16,7 +16,6 @@ public class FacultyResponse {
     UUID publicId;
     String code;
     String name;
-    HeadOfDepartmentResponse headOfDepartment;
     Long totalMajors;
     String status;
     ActiveStatus statusCode;

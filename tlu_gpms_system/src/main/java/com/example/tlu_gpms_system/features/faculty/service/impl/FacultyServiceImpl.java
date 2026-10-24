@@ -4,16 +4,12 @@ import com.example.tlu_gpms_system.common.dto.PageResponse;
 import com.example.tlu_gpms_system.common.enums.ActiveStatus;
 import com.example.tlu_gpms_system.configuration.exception.AppException;
 import com.example.tlu_gpms_system.configuration.exception.ErrorCode;
-import com.example.tlu_gpms_system.features.account.entity.Account;
-import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
-import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
-import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;
+import com.example.tlu_gpms_system.features.account.service.AccountQueryService;
 import com.example.tlu_gpms_system.features.faculty.dto.request.FacultyCreationRequest;
 import com.example.tlu_gpms_system.features.faculty.dto.request.FacultyUpdateRequest;
 import com.example.tlu_gpms_system.features.faculty.dto.request.MajorCreationRequest;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyDetailResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyResponse;
-import com.example.tlu_gpms_system.features.faculty.dto.response.HeadCandidateResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.MajorResponse;
 import com.example.tlu_gpms_system.features.faculty.entity.Faculty;
 import com.example.tlu_gpms_system.features.faculty.entity.Major;
@@ -42,9 +38,7 @@ public class FacultyServiceImpl implements FacultyService {
 
     private final FacultyRepository facultyRepository;
     private final MajorRepository majorRepository;
-    private final StudentRepository studentRepository;
-    private final TeacherRepository teacherRepository;
-    private final AccountRepository accountRepository;
+    private final AccountQueryService accountQueryService;
     private final FacultyMapping facultyMapping;
     private final MajorMapping majorMapping;
 
@@ -83,33 +77,13 @@ public class FacultyServiceImpl implements FacultyService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
-    public List<HeadCandidateResponse> getHeadCandidates() {
-        List<Account> candidates = accountRepository.findActiveHeadOfDepartmentCandidates();
-        return candidates.stream().map(a -> {
-            String lastName = a.getLastName() != null ? a.getLastName().trim() : "";
-            String firstName = a.getFirstName() != null ? a.getFirstName().trim() : "";
-            String fullName = (lastName + " " + firstName).trim();
-            if (fullName.isEmpty()) {
-                fullName = a.getEmail();
-            }
-            return HeadCandidateResponse.builder()
-                    .id(a.getId())
-                    .fullName(fullName)
-                    .email(a.getEmail())
-                    .academicRank(null)
-                    .build();
-        }).toList();
-    }
-
-    @Override
-    @PreAuthorize("hasRole('ADMIN')")
     public FacultyDetailResponse getById(String id) {
         Faculty faculty = findFacultyByIdOrPublicId(id);
         return facultyMapping.toDetailResponse(faculty);
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void create(FacultyCreationRequest request) {
         String trimmedCode = request.getCode().trim();
@@ -129,13 +103,11 @@ public class FacultyServiceImpl implements FacultyService {
             entity.setStatus(ActiveStatus.ACTIVE);
         }
 
-        entity.setHeadOfDepartment(resolveHeadOfDepartment(request.getHeadOfDepartmentId()));
-
         facultyRepository.save(entity);
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void update(String id, FacultyUpdateRequest request) {
         Faculty entity = findFacultyByIdOrPublicId(id);
@@ -164,15 +136,11 @@ public class FacultyServiceImpl implements FacultyService {
             entity.setStatus(request.getStatus());
         }
 
-        if (request.getHeadOfDepartmentId() != null) {
-            entity.setHeadOfDepartment(resolveHeadOfDepartment(request.getHeadOfDepartmentId()));
-        }
-
         facultyRepository.save(entity);
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void delete(String id) {
         Faculty entity = findFacultyByIdOrPublicId(id);
@@ -206,7 +174,7 @@ public class FacultyServiceImpl implements FacultyService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void addMajor(String id, MajorCreationRequest request) {
         Faculty faculty = findFacultyByIdOrPublicId(id);
@@ -225,31 +193,6 @@ public class FacultyServiceImpl implements FacultyService {
         }
 
         majorRepository.save(major);
-    }
-
-    /**
-     * Xác thực và tìm tài khoản Trưởng khoa theo ID (có role HEAD_OF_DEPARTMENT và status = true)
-     */
-    private Account resolveHeadOfDepartment(Long headOfDepartmentId) {
-        if (headOfDepartmentId == null) {
-            return null;
-        }
-
-        Account account = accountRepository.findById(headOfDepartmentId)
-                .orElseThrow(() -> new AppException(ErrorCode.HEAD_OF_DEPARTMENT_NOT_FOUND));
-
-        if (account.getStatus() == null || !account.getStatus()) {
-            throw new AppException(ErrorCode.ACCOUNT_NOT_HEAD_OF_DEPARTMENT);
-        }
-
-        boolean hasHeadRole = account.getRoles() != null && account.getRoles().stream()
-                .anyMatch(r -> "HEAD_OF_DEPARTMENT".equalsIgnoreCase(r.getName()));
-
-        if (!hasHeadRole) {
-            throw new AppException(ErrorCode.ACCOUNT_NOT_HEAD_OF_DEPARTMENT);
-        }
-
-        return account;
     }
 
     /**
@@ -282,15 +225,8 @@ public class FacultyServiceImpl implements FacultyService {
         if (majorRepository.existsByFacultyAndStatus(faculty, ActiveStatus.ACTIVE)) {
             return true;
         }
-        // 2. Kiểm tra có sinh viên đang hoạt động
-        if (studentRepository.countActiveStudentsByFaculty(faculty) > 0) {
-            return true;
-        }
-        // 3. Kiểm tra có giảng viên đang hoạt động
-        if (teacherRepository.countActiveTeachersByFaculty(faculty) > 0) {
-            return true;
-        }
-        return false;
+        // 2. Kiểm tra có sinh viên hoặc giảng viên đang hoạt động
+        return accountQueryService.existsActiveStudentOrTeacherInFaculty(faculty);
     }
 
     /**
@@ -301,14 +237,7 @@ public class FacultyServiceImpl implements FacultyService {
         if (majorRepository.countByFaculty(faculty) > 0) {
             return true;
         }
-        // 2. Có bất kỳ sinh viên nào không
-        if (studentRepository.countByMajorFaculty(faculty) > 0) {
-            return true;
-        }
-        // 3. Có bất kỳ giảng viên nào không
-        if (teacherRepository.countByMajorFaculty(faculty) > 0) {
-            return true;
-        }
-        return false;
+        // 2. Có bất kỳ sinh viên hoặc giảng viên nào không
+        return accountQueryService.existsStudentOrTeacherInFaculty(faculty);
     }
 }

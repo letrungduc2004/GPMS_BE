@@ -1,7 +1,8 @@
 # Bộ file test import giáo viên (`POST /teacher/import`)
 
 - Email trong trường: `gv.testNN@tlu.edu.vn`, ngoài trường: `gv.ngoaiNN@gmail.com`. SĐT mặc định `03618000NN`.
-- Giáo viên trong trường: đơn vị công tác phải là `Trường Đại học Thủy lợi` (không phân biệt hoa/thường) và bắt buộc có ngành. Giáo viên ngoài trường: đơn vị công tác là trường khác, bỏ trống ngành.
+- Giáo viên trong trường: đơn vị công tác phải là `Trường Đại học Thủy lợi` (không phân biệt hoa/thường) và bắt buộc có ngành. Giáo viên ngoài trường: đơn vị công tác là trường khác và **không có ngành**. Ô ngành bị bỏ qua, kể cả khi có điền (không báo lỗi), DB luôn lưu `major_id = NULL`; kích hoạt lại giáo viên ngoài trường cũ còn ngành thì ngành bị xóa.
+- Phạm vi ngành: Admin import được mọi ngành. Trưởng ngành chỉ import được giáo viên trong trường thuộc ngành mình quản lý (xem T13, T14). Giáo viên ngoài trường dùng chung: mọi Trưởng ngành đều import, xem danh sách / chi tiết, kích hoạt và sửa số lượng hướng dẫn được.
 - Số lượng hướng dẫn mặc định: **20** cho trong trường, **10** cho ngoài trường.
 - Import **theo đúng thứ tự file**. T05 cần T01 và `S01` của sinh viên. T06 cần trạng thái sau T05 và chạy thêm SQL trước khi import.
 - Dòng lỗi không làm hỏng cả file: các dòng hợp lệ vẫn được lưu (HTTP 200). Chỉ lỗi toàn file mới trả HTTP 400 và không lưu dòng nào.
@@ -10,6 +11,10 @@
 ## Chạy lại từ đầu
 
 ```sql
+-- Gỡ Trưởng ngành trước, nếu không khóa ngoại major.head_account_id sẽ chặn lệnh xóa account
+UPDATE major m JOIN account a ON a.id = m.head_account_id
+SET m.head_account_id = NULL
+WHERE a.email LIKE 'gv.test%@tlu.edu.vn' OR a.email LIKE 'gv.ngoai%@gmail.com';
 DELETE ur FROM user_role ur JOIN account a ON a.id = ur.user_id
 WHERE a.email LIKE 'gv.test%@tlu.edu.vn' OR a.email LIKE 'gv.ngoai%@gmail.com';
 DELETE t FROM teacher t JOIN account a ON a.id = t.account_id
@@ -32,8 +37,8 @@ DELETE FROM account WHERE email LIKE 'gv.test%@tlu.edu.vn' OR email LIKE 'gv.ngo
 | TI09 | | 7 | gv.ngoai12 | Đơn vị `Đại học #1` | Đơn vị công tác chỉ gồm chữ, số, khoảng trắng và các dấu . , - & ( ) ' / (tối đa 255 ký tự) |
 | TI10 | | 8 | gv.test13 | Email trong trường + đơn vị `Đại học Bách khoa Hà Nội` | Đơn vị công tác không khớp với email (email @tlu.edu.vn phải là Trường Đại học Thủy lợi, email @gmail.com phải là trường khác) |
 | TI11 | | 9 | gv.ngoai14 | Email ngoài trường + đơn vị `Trường Đại học Thủy lợi` | Đơn vị công tác không khớp với email (...) |
-| TI12 | | 10 | gv.ngoai15 | Ngoài trường nhưng điền ngành | Giáo viên ngoài trường không được điền ngành |
-| TI13 | | 11 | gv.test16 | Ngành `Khoa học máy tính` | Ngành học không tồn tại trong hệ thống |
+| TI12 | | 10 | gv.ngoai15 | Ngoài trường, điền ngành `Kỹ thuật phần mềm` (Admin import) | Thêm giáo viên thành công, ngành bị bỏ qua (DB không lưu ngành), số lượng 10 |
+| TI13 | | 11 | gv.test16 | Ngành `Khoa học mật mã` | Ngành học không tồn tại trong hệ thống |
 | TI14 | `T03_o_trong_va_nhieu_loi.xlsx` | 2 | gv.test17 | Trống họ | Họ không được để trống |
 | TI15 | | 3 | gv.test18 | Trống tên | Tên không được để trống |
 | TI16 | | 4 | (trống) | Trống email | Email không được để trống |
@@ -81,6 +86,56 @@ WHERE a.email = 'gv.test03@tlu.edu.vn';
 | TI37 | 5 | gv.ngoai06 | Đổi đơn vị → `Đại học Xây dựng` | Đã kích hoạt lại và cập nhật: Đơn vị công tác (số lượng 10) |
 | TI38 | 6 | gv.test04 | Đổi SĐT sang `0361800005` của gv.ngoai05 | Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống. gv.test04 vẫn ở trạng thái tắt |
 
+## Phạm vi ngành (Trưởng ngành Kỹ thuật phần mềm import)
+
+Thứ tự: chạy lại từ đầu → Admin import T01 → gán gv.test01 làm Trưởng ngành KTPM → import T13 → import T14. Không chạy T05, T06 trong lượt này, hoặc chạy lại từ đầu trước.
+
+Gán Trưởng ngành (Admin):
+
+```sql
+SELECT id FROM account WHERE email = 'gv.test01@tlu.edu.vn';
+SELECT id FROM major WHERE code = 'KTPM01';
+```
+
+1. Gọi `PUT /major/{majorId}/head` với body `{"accountId": <id account gv.test01>}` bằng token Admin.
+2. Lấy token mới của gv.test01 bằng `POST /login-postman` (body là email). Token cũ không có role `HEAD_OF_MAJOR`.
+3. Dùng token này để import T13, T14.
+
+### `T13_pham_vi_nganh_truong_nganh.xlsx`
+
+| ID | Dòng | Email | Dữ liệu test | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- | :--- |
+| TI44 | 2 | gv.test41 | Trong trường, ngành `Kỹ thuật phần mềm` | Thêm giáo viên thành công, số lượng 20 |
+| TI45 | 3 | gv.test42 | Trong trường, ngành `Hệ thống thông tin` | Bạn không có quyền thao tác trên ngành này. Không lưu |
+| TI46 | 4 | gv.ngoai43 | Ngoài trường, bỏ trống ngành | Thêm giáo viên thành công, số lượng 10, DB không lưu ngành |
+| TI47 | 5 | gv.ngoai44 | Ngoài trường, ngành `Kỹ thuật phần mềm` | Thêm giáo viên thành công, số lượng 10, ngành bị bỏ qua (DB không lưu ngành) |
+| TI48 | 6 | gv.ngoai45 | Ngoài trường, ngành `Công nghệ thông tin` (ngành khác) | Thêm giáo viên thành công, số lượng 10, ngành bị bỏ qua nên không bị chặn phạm vi ngành |
+| TI49 | 7 | gv.test02 | Y hệt T01 (ngành `Hệ thống thông tin`, đã có trong DB) | Bạn không có quyền thao tác trên ngành này. DB không đổi |
+
+### `T14_doi_chieu_db_pham_vi_nganh.xlsx` (sau T01, T13)
+
+Trước khi import, tắt 4 giáo viên:
+
+```sql
+UPDATE account SET status = 0
+WHERE email IN ('gv.test02@tlu.edu.vn', 'gv.ngoai05@gmail.com',
+                'gv.ngoai06@gmail.com', 'gv.test41@tlu.edu.vn');
+```
+
+| ID | Dòng | Email | Dữ liệu test (so với DB) | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- | :--- |
+| TI50 | 2 | gv.test02 | Đang tắt, DB ngành `Hệ thống thông tin`, dòng ghi ngành `Kỹ thuật phần mềm` | Lỗi `3019`: Giáo viên thuộc ngành khác, bạn không có quyền cập nhật. gv.test02 vẫn tắt, ngành vẫn là Hệ thống thông tin |
+| TI51 | 3 | gv.test03 | Đang hoạt động, DB ngành `Công nghệ thông tin`, dòng ghi ngành `Kỹ thuật phần mềm` | Cảnh báo `1100`: Giáo viên đã có trong hệ thống, thông tin không thay đổi. DB không đổi (giáo viên đang hoạt động được báo trước khi kiểm tra phạm vi ngành) |
+| TI52 | 4 | gv.ngoai05 | Đang tắt, DB không có ngành, dòng bỏ trống ngành | Đã kích hoạt lại tài khoản giáo viên. DB vẫn không có ngành, số lượng 10 |
+| TI53 | 5 | gv.ngoai06 | Đang tắt, đổi SĐT → `0361800096`, ngành `Kỹ thuật phần mềm` | Đã kích hoạt lại và cập nhật: Số điện thoại. Ngành bị bỏ qua, DB vẫn không có ngành |
+| TI54 | 6 | gv.test41 | Đang tắt, y hệt DB | Đã kích hoạt lại tài khoản giáo viên |
+
+### Trưởng ngành bị gỡ khỏi ngành
+
+| ID | Thao tác | Kết quả mong đợi |
+| :--- | :--- | :--- |
+| TI55 | Chạy `UPDATE major SET head_account_id = NULL WHERE code = 'KTPM01';`, giữ nguyên token của gv.test01 rồi import T13 | HTTP 403, code `3018`: Bạn không có quyền thao tác trên ngành này. Không lưu dòng nào |
+
 ## Lỗi toàn file (HTTP 400, code 4000, không lưu dòng nào)
 
 | ID | File | Nội dung | Message |
@@ -91,4 +146,4 @@ WHERE a.email = 'gv.test03@tlu.edu.vn';
 | TI42 | `T11_file_gia_xlsx.xlsx` | File text đổi đuôi thành `.xlsx` | File import phải có định dạng .xlsx |
 | TI43 | `T12_file_rong_0_byte.xlsx` | File 0 byte | File import không được để trống |
 
-> Đã đọc lại các file bằng `TeacherExcelReader` + `TeacherRowValidator` của BE, kèm bước kiểm tra trùng trong file giống service. Kết quả định dạng, trùng trong file và lỗi toàn file khớp bảng trên. Đối chiếu DB (T05, T06) được suy ra từ `UserServiceImpl` nên cần chạy API thật để xác nhận.
+> Đã đọc lại các file bằng `TeacherExcelReader` + `TeacherRowValidator` của BE, kèm bước kiểm tra trùng trong file giống service. Kết quả định dạng, trùng trong file và lỗi toàn file khớp bảng trên. Đối chiếu DB (T05, T06) và phạm vi ngành (T13, T14) được suy ra từ `UserServiceImpl` nên cần chạy API thật để xác nhận.

@@ -57,18 +57,17 @@ public final class TeacherRowValidator {
             errors.put(TeacherColumn.ORGANIZATION, ErrorCode.ORGANIZATION_NOT_MATCH_EMAIL);
         }
 
-        // Giáo viên ngoài trường không có ngành; trong trường bắt buộc có.
-        // Email lỗi (chưa biết loại) thì bỏ qua ô trống, ô có giá trị vẫn kiểm tra danh mục
-        if (type == TeacherOrganization.EXTERNAL) {
-            if (!row.getMajor().isEmpty()) {
-                errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_NOT_ALLOWED);
+        // Trong trường bắt buộc có ngành. Ngoài trường không có ngành: bỏ qua ô ngành (service lưu null), không báo lỗi.
+        // Email lỗi (chưa biết loại) thì bỏ qua ô trống, ô có giá trị vẫn kiểm tra danh mục.
+        // Phạm vi ngành của người import kiểm tra ở service
+        if (type != TeacherOrganization.EXTERNAL) {
+            if (row.getMajor().isEmpty()) {
+                if (type == TeacherOrganization.INTERNAL) {
+                    errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_EMPTY);
+                }
+            } else if (!majorMap.containsKey(TextNormalizer.toLowerKey(row.getMajor()))) {
+                errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_INVALID);
             }
-        } else if (row.getMajor().isEmpty()) {
-            if (type == TeacherOrganization.INTERNAL) {
-                errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_EMPTY);
-            }
-        } else if (!majorMap.containsKey(TextNormalizer.toLowerKey(row.getMajor()))) {
-            errors.put(TeacherColumn.MAJOR, ErrorCode.MAJOR_INVALID);
         }
 
         // amount được bỏ trống (gán mặc định theo email)

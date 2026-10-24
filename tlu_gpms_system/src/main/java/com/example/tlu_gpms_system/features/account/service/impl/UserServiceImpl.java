@@ -38,7 +38,9 @@ import com.example.tlu_gpms_system.features.account.service.helper.TeacherOrgani
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherRowData;
 import com.example.tlu_gpms_system.features.account.service.helper.TeacherRowValidator;
 import com.example.tlu_gpms_system.features.faculty.entity.Major;
-import com.example.tlu_gpms_system.features.faculty.repository.MajorRepository;
+import com.example.tlu_gpms_system.features.faculty.service.MajorService;
+import com.example.tlu_gpms_system.features.faculty.service.scope.MajorScope;
+import com.example.tlu_gpms_system.features.faculty.service.scope.MajorScopeResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -50,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -61,7 +64,6 @@ import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class UserServiceImpl implements UserService {
 
     // Whitelist sort cho danh sách sinh viên: key FE gửi lên -> đường dẫn JPQL (alias s., a., m. trong StudentRepository).
@@ -92,46 +94,61 @@ public class UserServiceImpl implements UserService {
     private final StudentRepository studentRepository;
     private final TeacherRepository teacherRepository;
     private final AccountRepository accountRepository;
-    private final MajorRepository majorRepository;
+    private final MajorService majorService;
     private final RoleRepository roleRepository;
+    private final MajorScopeResolver majorScopeResolver;
 
     @Override
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('VIEW_STUDENT')")
     public Page<StudentResponse> getAllStudents(String keyword, String batch, UUID majorId, AccountStatusFilter status,
                                                 Pageable pageable) {
         AccountStatusFilter statusFilter = status == null ? AccountStatusFilter.ACTIVE : status;
+        MajorScope scope = majorScopeResolver.current();
         return studentRepository.findAllStudents(blankToNull(TextNormalizer.normalize(keyword)),
                 blankToNull(TextNormalizer.toUpperKey(batch)), majorId, statusFilter.toActive(),
+                scope.all(), queryMajorIds(scope),
                 toWhitelistedPageable(pageable, STUDENT_SORT_FIELDS, STUDENT_DEFAULT_SORT, STUDENT_SORT_TIE_BREAKER));
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('VIEW_STUDENT')")
     public StudentDetailResponse getStudentDetail(String publicId) {
-        return studentRepository.findStudentDetail(parsePublicId(publicId, ErrorCode.STUDENT_NOT_FOUND))
+        UUID id = parsePublicId(publicId, ErrorCode.STUDENT_NOT_FOUND);
+        // Sinh viên ngoài phạm vi ngành coi như không tồn tại (không lộ dữ liệu ngành khác)
+        MajorScope scope = majorScopeResolver.current();
+        return studentRepository.findStudentDetail(id, scope.all(), queryMajorIds(scope))
                 .orElseThrow(() -> new AppException(ErrorCode.STUDENT_NOT_FOUND));
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('VIEW_TEACHER')")
     public Page<TeacherResponse> getAllTeachers(String name, String organizationType, String majorName, Pageable pageable) {
         TeacherOrganization type = TeacherOrganization.fromFilter(organizationType);
         Boolean internal = type == null ? null : type == TeacherOrganization.INTERNAL;
+        MajorScope scope = majorScopeResolver.current();
         return teacherRepository.findAllTeachers(blankToNull(TextNormalizer.normalize(name)),
                 internal, blankToNull(TextNormalizer.normalize(majorName)),
+                scope.all(), queryMajorIds(scope),
                 toWhitelistedPageable(pageable, TEACHER_SORT_FIELDS, TEACHER_DEFAULT_SORT, TEACHER_SORT_TIE_BREAKER));
     }
 
     @Override
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('VIEW_TEACHER')")
     public TeacherDetailResponse getTeacherDetail(String publicId) {
-        return teacherRepository.findTeacherDetail(parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND))
+        UUID id = parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND);
+        // Giáo viên ngoài phạm vi ngành coi như không tồn tại (không lộ dữ liệu ngành khác)
+        MajorScope scope = majorScopeResolver.current();
+        return teacherRepository.findTeacherDetail(id, scope.all(), queryMajorIds(scope))
                 .orElseThrow(() -> new AppException(ErrorCode.TEACHER_NOT_FOUND));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasAuthority('IMPORT_STUDENT')")
     public StudentImportResponse importStudents(MultipartFile file) {
         List<StudentRowData> rows = StudentExcelReader.read(file);
         List<RowOutcome> outcomes = processStudentRows(rows);
@@ -150,8 +167,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('IMPORT_STUDENT')")
     public StudentCreationResult createStudent(StudentCreationRequest request) {
         RowOutcome outcome = processStudentRows(List.of(StudentRowData.fromRequest(request))).get(0);
         if (outcome.status() == RowImportStatus.ERROR) {
@@ -164,11 +181,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('UPDATE_STUDENT_STATUS')")
     public boolean activateStudent(String publicId) {
         Student student = studentRepository.findByPublicId(parsePublicId(publicId, ErrorCode.STUDENT_NOT_FOUND))
                 .orElseThrow(() -> new AppException(ErrorCode.STUDENT_NOT_FOUND));
+        majorScopeResolver.requireAllows(student.getMajor());
         Account account = student.getAccount();
         if (Boolean.TRUE.equals(account.getStatus()) && Boolean.TRUE.equals(student.getStatus())) {
             return false;
@@ -182,8 +200,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('IMPORT_TEACHER')")
     public TeacherImportResponse importTeachers(MultipartFile file) {
         List<TeacherRowData> rows = TeacherExcelReader.read(file);
         List<RowOutcome> outcomes = processTeacherRows(rows);
@@ -202,8 +220,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @Transactional(rollbackFor = Exception.class)
+    @PreAuthorize("hasAuthority('IMPORT_TEACHER')")
     public TeacherCreationResult createTeacher(TeacherCreationRequest request) {
         RowOutcome outcome = processTeacherRows(List.of(TeacherRowData.fromRequest(request))).get(0);
         if (outcome.status() == RowImportStatus.ERROR) {
@@ -217,12 +235,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasAuthority('UPDATE_TEACHER_STATUS')")
     public boolean activateTeacher(String publicId) {
         Teacher teacher = teacherRepository.findByPublicId(parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND))
                 .orElseThrow(() -> new AppException(ErrorCode.TEACHER_NOT_FOUND));
+        requireTeacherInScope(teacher);
         Account account = teacher.getAccount();
-        // Đang hoạt động sẵn (gồm cả Trưởng bộ môn): không cập nhật gì
+        // Đang hoạt động sẵn (gồm cả Trưởng ngành): không cập nhật gì
         if (Boolean.TRUE.equals(account.getStatus())) {
             return false;
         }
@@ -240,7 +259,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasAuthority('CONFIG_ADVISOR_QUOTA')")
     public void updateTeacherAmount(String publicId, TeacherAmountRequest request) {
         // Kiểm tra dữ liệu nhập trước, sai thì không truy vấn DB
         String amount = TextNormalizer.normalize(request.getAmount());
@@ -252,6 +271,7 @@ public class UserServiceImpl implements UserService {
         }
         Teacher teacher = teacherRepository.findByPublicId(parsePublicId(publicId, ErrorCode.TEACHER_NOT_FOUND))
                 .orElseThrow(() -> new AppException(ErrorCode.TEACHER_NOT_FOUND));
+        requireTeacherInScope(teacher);
         // Giáo viên bị tắt: kích hoạt lại sẽ đặt lại amount về mặc định, nên không cho sửa trước
         if (!Boolean.TRUE.equals(teacher.getAccount().getStatus())) {
             throw new AppException(ErrorCode.TEACHER_INACTIVE);
@@ -263,13 +283,16 @@ public class UserServiceImpl implements UserService {
 
     // Phân loại toàn bộ các dòng trên bộ nhớ, cuối cùng mới lưu các dòng hợp lệ
     private List<RowOutcome> processStudentRows(List<StudentRowData> rows) {
-        // Query 1: danh mục ngành
-        Map<String, Major> majorMap = buildMajorMap(majorRepository.findAll());
+        // Query 1: phạm vi ngành của người import
+        MajorScope scope = currentWriteScope();
+        // Query 2: danh mục ngành
+        Map<String, Major> majorMap = buildMajorMap(majorService.getAllMajorEntities());
 
-        // Bước 1: Trống -> Định dạng/Danh mục -> Trùng trong file
+        // Bước 1: Trống -> Định dạng/Danh mục -> Phạm vi ngành -> Trùng trong file
         List<Map<StudentColumn, ErrorCode>> rowErrors = rows.stream()
                 .map(row -> StudentRowValidator.validate(row, majorMap))
                 .toList();
+        markOutOfScope(rows, rowErrors, StudentColumn.MAJOR, StudentRowData::getMajor, majorMap, scope);
         markDuplicates(rows, rowErrors, StudentColumn.STUDENT_CODE, StudentRowData::getStudentCode,
                 ErrorCode.STUDENT_CODE_DUPLICATED_IN_FILE);
         markDuplicates(rows, rowErrors, StudentColumn.EMAIL, StudentRowData::getEmail,
@@ -294,12 +317,12 @@ public class UserServiceImpl implements UserService {
         Map<String, List<Account>> accountsByPhone = new HashMap<>();
         Role studentRole = null;
         if (!studentCodes.isEmpty()) {
-            // Query 2, Query 3
+            // Query 3, Query 4
             studentRepository.findAllByStudentCodeIn(studentCodes)
                     .forEach(student -> studentByCode.put(student.getStudentCode(), student));
             accountRepository.findAllByEmailIn(emails)
                     .forEach(account -> accountByEmail.put(TextNormalizer.toLowerKey(account.getEmail()), account));
-            // Query 4: tài khoản đang giữ các SĐT trong file
+            // Query 5: tài khoản đang giữ các SĐT trong file
             accountsByPhone = groupAccountsByPhone(phones);
             studentRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.STUDENT.name())
                     .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
@@ -410,13 +433,19 @@ public class UserServiceImpl implements UserService {
 
     // Phân loại toàn bộ các dòng trên bộ nhớ, cuối cùng mới lưu các dòng hợp lệ
     private List<RowOutcome> processTeacherRows(List<TeacherRowData> rows) {
-        // Query 1: danh mục ngành
-        Map<String, Major> majorMap = buildMajorMap(majorRepository.findAll());
+        // Query 1: phạm vi ngành của người import
+        MajorScope scope = currentWriteScope();
+        // Query 2: danh mục ngành
+        List<Major> majors = majorService.getAllMajorEntities();
+        Map<String, Major> majorMap = buildMajorMap(majors);
 
-        // Bước 1: Trống -> Định dạng/Danh mục -> Trùng trong file
+        // Bước 1: Trống -> Định dạng/Danh mục -> Phạm vi ngành -> Trùng trong file
         List<Map<TeacherColumn, ErrorCode>> rowErrors = rows.stream()
                 .map(row -> TeacherRowValidator.validate(row, majorMap))
                 .toList();
+        // Giáo viên ngoài trường không có ngành nên không xét phạm vi ngành
+        markOutOfScope(rows, rowErrors, TeacherColumn.MAJOR, row -> isExternal(row) ? "" : row.getMajor(),
+                majorMap, scope);
         markDuplicates(rows, rowErrors, TeacherColumn.EMAIL, TeacherRowData::getEmail,
                 ErrorCode.EMAIL_DUPLICATED_IN_FILE);
         markDuplicates(rows, rowErrors, TeacherColumn.PHONE, TeacherRowData::getPhone,
@@ -437,18 +466,18 @@ public class UserServiceImpl implements UserService {
         Map<String, List<Account>> accountsByPhone = new HashMap<>();
         Role supervisorRole = null;
         if (!emails.isEmpty()) {
-            // Query 2: tài khoản theo email
+            // Query 3: tài khoản theo email
             accountRepository.findAllByEmailIn(emails)
                     .forEach(account -> accountByEmail.put(TextNormalizer.toLowerKey(account.getEmail()), account));
-            // Query 3: hồ sơ giáo viên của các tài khoản đó
+            // Query 4: hồ sơ giáo viên của các tài khoản đó
             if (!accountByEmail.isEmpty()) {
                 List<Long> accountIds = accountByEmail.values().stream().map(Account::getId).toList();
                 teacherRepository.findAllByAccountIdIn(accountIds)
                         .forEach(teacher -> teacherByAccountId.put(teacher.getAccount().getId(), teacher));
             }
-            // Query 4: tài khoản đang giữ các SĐT trong file
+            // Query 5: tài khoản đang giữ các SĐT trong file
             accountsByPhone = groupAccountsByPhone(phones);
-            // Query 5: role gán cho giáo viên mới
+            // Query 6: role gán cho giáo viên mới
             supervisorRole = roleRepository.findById(com.example.tlu_gpms_system.common.enums.Role.SUPERVISOR.name())
                     .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXIST));
         }
@@ -463,10 +492,11 @@ public class UserServiceImpl implements UserService {
                 outcomes.add(rowError(errors, TeacherColumn::getLabel));
                 continue;
             }
-            Major major = majorMap.get(TextNormalizer.toLowerKey(row.getMajor()));
+            // Giáo viên ngoài trường luôn không có ngành, kể cả khi file có điền (ô ngành bị bỏ qua)
+            Major major = isExternal(row) ? null : majorMap.get(TextNormalizer.toLowerKey(row.getMajor()));
             Account account = accountByEmail.get(row.getEmail());
             Teacher teacher = account == null ? null : teacherByAccountId.get(account.getId());
-            outcomes.add(reconcileTeacher(row, major, account, teacher, accountsByPhone, supervisorRole,
+            outcomes.add(reconcileTeacher(row, major, account, teacher, accountsByPhone, supervisorRole, scope,
                     accountsToSave, teachersToSave));
         }
 
@@ -480,6 +510,7 @@ public class UserServiceImpl implements UserService {
     // 5 trường hợp loại trừ nhau khi đối chiếu với DB
     private RowOutcome reconcileTeacher(TeacherRowData row, Major major, Account account, Teacher teacher,
                                         Map<String, List<Account>> accountsByPhone, Role supervisorRole,
+                                        MajorScope scope,
                                         List<Account> accountsToSave, List<Teacher> teachersToSave) {
         Long amount = resolveAmount(row);
 
@@ -521,16 +552,21 @@ public class UserServiceImpl implements UserService {
             return RowOutcome.success(amount);
         }
 
-        // TH4: đang hoạt động sẵn trong kì này (gồm cả Trưởng bộ môn), không cập nhật gì
+        // TH4: đang hoạt động sẵn trong kì này (gồm cả Trưởng ngành), không cập nhật gì
         if (Boolean.TRUE.equals(account.getStatus())) {
             return RowOutcome.warning(ErrorCode.TEACHER_ALREADY_ACTIVE, teacher.getAmount());
+        }
+        // Giáo viên trong trường đang thuộc ngành ngoài phạm vi: không được kéo về ngành khác.
+        // Giáo viên ngoài trường dùng chung cho mọi Trưởng ngành (dữ liệu cũ còn ngành sẽ bị xóa ngành bên dưới)
+        if (major != null && teacher.getMajor() != null && !scope.allows(teacher.getMajor())) {
+            return RowOutcome.error(ErrorCode.TEACHER_MANAGED_BY_OTHER_MAJOR);
         }
         // SĐT sắp ghi vào tài khoản không được thuộc tài khoản khác
         if (isPhoneTakenByOther(row.getPhone(), account, accountsByPhone)) {
             return RowOutcome.duplicated(List.of("Số điện thoại"));
         }
 
-        // Thông tin được phép thay đổi theo kì, ghi lại để báo cho TBM biết field nào bị ghi đè
+        // Thông tin được phép thay đổi theo kì, ghi lại để báo cho người import biết field nào bị ghi đè
         List<String> changedFields = new ArrayList<>();
         if (!TextNormalizer.normalize(account.getPhone()).equals(row.getPhone())) {
             changedFields.add("Số điện thoại");
@@ -598,6 +634,51 @@ public class UserServiceImpl implements UserService {
             keys.add(rowErrors.get(i).containsKey(column) ? null : TextNormalizer.toLowerKey(getter.apply(rows.get(i))));
         }
         DuplicateUtils.findDuplicateIndexes(keys).forEach(i -> rowErrors.get(i).put(column, duplicateError));
+    }
+
+    // Tham số IN của query danh sách / chi tiết luôn cần list khác rỗng để sinh SQL hợp lệ.
+    // Admin (allMajors = true) không dùng tới list; Trưởng ngành đã bị gỡ khỏi ngành thì id -1 không khớp ngành nào
+    private static Collection<Long> queryMajorIds(MajorScope scope) {
+        return scope.majorIds().isEmpty() ? Set.of(-1L) : scope.majorIds();
+    }
+
+    // Email có đuôi ngoài trường. Chỉ dùng sau khi đã validate (email đã chuẩn hóa về chữ thường)
+    private static boolean isExternal(TeacherRowData row) {
+        return TeacherOrganization.ofEmail(row.getEmail()) == TeacherOrganization.EXTERNAL;
+    }
+
+    // Giáo viên chưa có ngành (ngoài trường): mọi Trưởng ngành còn phụ trách ngành đều thao tác được.
+    // Có ngành thì ngành phải thuộc phạm vi người thao tác
+    private void requireTeacherInScope(Teacher teacher) {
+        if (teacher.getMajor() == null) {
+            currentWriteScope();
+        } else {
+            majorScopeResolver.requireAllows(teacher.getMajor());
+        }
+    }
+
+    // Trưởng ngành đã bị gỡ khỏi ngành (scope rỗng): chặn cả lô, không truy vấn thêm
+    private MajorScope currentWriteScope() {
+        MajorScope scope = majorScopeResolver.current();
+        if (scope.isEmpty()) {
+            throw new AppException(ErrorCode.MAJOR_NOT_IN_SCOPE);
+        }
+        return scope;
+    }
+
+    // Ngành điền trong dòng phải thuộc phạm vi của người import. Ô ngành trống / đã lỗi ở bước trước thì bỏ qua
+    private <R, C extends Enum<C>> void markOutOfScope(List<R> rows, List<Map<C, ErrorCode>> rowErrors, C column,
+                                                       Function<R, String> getter, Map<String, Major> majorMap,
+                                                       MajorScope scope) {
+        for (int i = 0; i < rows.size(); i++) {
+            if (rowErrors.get(i).containsKey(column)) {
+                continue;
+            }
+            Major major = majorMap.get(TextNormalizer.toLowerKey(getter.apply(rows.get(i))));
+            if (major != null && !scope.allows(major)) {
+                rowErrors.get(i).put(column, ErrorCode.MAJOR_NOT_IN_SCOPE);
+            }
+        }
     }
 
     // Key là tên ngành hoặc mã ngành (viết thường). Tên ngành được ưu tiên: mã ngành không ghi đè key tên

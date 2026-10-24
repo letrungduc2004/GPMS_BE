@@ -18,8 +18,6 @@ public class FacultyCreationRequest {
     @NotBlank(message = "FACULTY_NAME_EMPTY")
     String name;
 
-    Long headOfDepartmentId;
-
     String description;
 
     ActiveStatus status;

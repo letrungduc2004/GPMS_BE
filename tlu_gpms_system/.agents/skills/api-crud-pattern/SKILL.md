@@ -19,16 +19,16 @@ description: >-
 ## Template Controller (CRUD đầy đủ)
 - KHÔNG đặt `@PreAuthorize` / `@PostAuthorize` ở Controller.
 - Endpoint là danh từ số ít, ví dụ `/topic`.
+- TUYỆT ĐỐI KHÔNG dùng `@RequestMapping` (cả cấp class lẫn method): ghi đầy đủ đường dẫn trong từng `@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping`, `@DeleteMapping`.
 ```java
 @RestController
-@RequestMapping("/<endpoint>")
 @RequiredArgsConstructor
 public class <Entity>Controller {
 
     private final <Entity>Service service;
 
     // Lấy danh sách có phân trang
-    @GetMapping
+    @GetMapping("/<endpoint>")
     public APIResponse<Page<<Entity>Response>> getAll(
             @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         return APIResponse.<Page<<Entity>Response>>builder()
@@ -38,7 +38,7 @@ public class <Entity>Controller {
     }
 
     // Lấy chi tiết theo publicId
-    @GetMapping("/{publicId}")
+    @GetMapping("/<endpoint>/{publicId}")
     public APIResponse<<Entity>Response> getByPublicId(@PathVariable UUID publicId) {
         return APIResponse.<<Entity>Response>builder()
                 .code(1000)
@@ -47,7 +47,7 @@ public class <Entity>Controller {
     }
 
     // Tạo mới
-    @PostMapping
+    @PostMapping("/<endpoint>")
     public APIResponse<Void> create(@RequestBody @Valid <Entity>Request request) {
         service.create(request);
         return APIResponse.<Void>builder()
@@ -57,7 +57,7 @@ public class <Entity>Controller {
     }
 
     // Cập nhật
-    @PutMapping("/{publicId}")
+    @PutMapping("/<endpoint>/{publicId}")
     public APIResponse<Void> update(
             @PathVariable UUID publicId,
             @RequestBody @Valid <Entity>Request request) {
@@ -69,7 +69,7 @@ public class <Entity>Controller {
     }
 
     // Xóa
-    @DeleteMapping("/{publicId}")
+    @DeleteMapping("/<endpoint>/{publicId}")
     public APIResponse<Void> delete(@PathVariable UUID publicId) {
         service.delete(publicId);
         return APIResponse.<Void>builder()
@@ -92,7 +92,7 @@ public interface <Entity>Service {
 ```
 
 ## Template Service Implementation
-- `@Transactional(readOnly = true)` ở cấp class (cho method đọc), `@Transactional(rollbackFor = Exception.class)` trên từng method thay đổi dữ liệu.
+- `@Transactional` CHỈ đặt ở cấp method, TUYỆT ĐỐI KHÔNG đặt ở cấp class: `@Transactional(readOnly = true)` trên từng method đọc, `@Transactional(rollbackFor = Exception.class)` trên từng method thay đổi dữ liệu.
 - Chỉ inject Repository của **chính feature này**. Cần dữ liệu/nghiệp vụ của feature khác thì inject `Service` interface của feature đó (xem mục "Quy tắc độc lập giữa các feature" trong CLAUDE.md / GEMINI.md).
 - `@PreAuthorize` / `@PostAuthorize` đặt trên từng method ở đây.
 - `<AUTH_EXPR>` là biểu thức phân quyền đã hỏi user, ví dụ:
@@ -104,13 +104,13 @@ public interface <Entity>Service {
 ```java
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class <Entity>ServiceImpl implements <Entity>Service {
 
     private final <Entity>Repository repository;
     private final <Entity>Mapping mapping;
 
     @Override
+    @Transactional(readOnly = true)
     @PreAuthorize("<AUTH_EXPR>")
     public Page<<Entity>Response> getAll(Pageable pageable) {
         // Ít field, không filter phức tạp: findAll + map
@@ -120,6 +120,7 @@ public class <Entity>ServiceImpl implements <Entity>Service {
     }
 
     @Override
+    @Transactional(readOnly = true)
     @PreAuthorize("<AUTH_EXPR>")
     public <Entity>Response getByPublicId(UUID publicId) {
         <Entity> entity = repository.findByPublicId(publicId)
@@ -183,8 +184,8 @@ public class <Entity>ServiceImpl implements <Entity>Service {
 6. **Tái sử dụng**: kiểm tra `common/utils` trước khi viết hàm tiện ích mới (chuẩn hóa chuỗi, đọc Excel, tìm trùng đều nằm trong `common/utils/excel/`)
 
 ## Hoàn thành khi
-- [ ] Controller không có annotation phân quyền, trả `APIResponse<T>`, dùng `@PageableDefault`
-- [ ] ServiceImpl có `@Transactional(readOnly = true)` ở class, `@Transactional(rollbackFor = Exception.class)` trên mọi method ghi
+- [ ] Controller không có annotation phân quyền, không có `@RequestMapping` (đường dẫn đầy đủ trong từng HTTP method mapping), trả `APIResponse<T>`, dùng `@PageableDefault`
+- [ ] ServiceImpl KHÔNG có `@Transactional` ở cấp class; `@Transactional(readOnly = true)` trên mọi method đọc, `@Transactional(rollbackFor = Exception.class)` trên mọi method ghi
 - [ ] ServiceImpl không inject Repository của feature khác (gọi qua `Service` interface)
 - [ ] Mỗi method public của ServiceImpl có `@PreAuthorize` (hoặc `@PostAuthorize`) với role/permission đã chốt
 - [ ] ErrorCode mới (`<ENTITY>_NOT_FOUND`, key validate) đã được thêm

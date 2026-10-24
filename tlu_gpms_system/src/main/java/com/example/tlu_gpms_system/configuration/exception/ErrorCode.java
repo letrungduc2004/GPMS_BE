@@ -135,6 +135,7 @@ public enum ErrorCode {
     FACULTY_STATUS_NULL(4000, "Trạng thái khoa không được để trống", HttpStatus.BAD_REQUEST),
     MAJOR_NAME_EMPTY(4000, "Tên ngành không được để trống", HttpStatus.BAD_REQUEST),
     MAJOR_STATUS_NULL(4000, "Trạng thái ngành không được để trống", HttpStatus.BAD_REQUEST),
+    MAJOR_HEAD_ACCOUNT_NULL(4000, "Tài khoản Trưởng ngành không được để trống", HttpStatus.BAD_REQUEST),
     // FACULTY & MAJOR BUSINESS LOGIC
     FACULTY_NOT_FOUND(3008, "Khoa không tồn tại", HttpStatus.NOT_FOUND),
     FACULTY_CODE_EXIST(3009, "Mã khoa đã tồn tại trong hệ thống", HttpStatus.CONFLICT),
@@ -143,8 +144,12 @@ public enum ErrorCode {
     FACULTY_CANNOT_BE_DEACTIVATED(3012, "Không thể vô hiệu hóa khoa nếu vẫn còn ngành hoặc sinh viên/giảng viên đang hoạt động trong khoa đó", HttpStatus.BAD_REQUEST),
     FACULTY_CANNOT_BE_DELETED(3013, "Không thể xóa khoa nếu vẫn còn ngành hoặc sinh viên/giảng viên đang hoạt động trong khoa đó", HttpStatus.BAD_REQUEST),
     MAJOR_CANNOT_BE_DELETED(3014, "Không thể xóa ngành vì vẫn còn sinh viên hoặc giảng viên thuộc ngành này", HttpStatus.BAD_REQUEST),
-    HEAD_OF_DEPARTMENT_NOT_FOUND(3015, "Tài khoản Trưởng khoa không tồn tại", HttpStatus.NOT_FOUND),
-    ACCOUNT_NOT_HEAD_OF_DEPARTMENT(3016, "Tài khoản được chọn phải có vai trò Trưởng khoa (HEAD_OF_DEPARTMENT) và đang hoạt động", HttpStatus.BAD_REQUEST),
+    // TRƯỞNG NGÀNH & PHẠM VI NGÀNH
+    HEAD_OF_MAJOR_NOT_FOUND(3015, "Tài khoản được chọn làm Trưởng ngành không tồn tại", HttpStatus.NOT_FOUND),
+    ACCOUNT_NOT_ELIGIBLE_HEAD_OF_MAJOR(3016, "Trưởng ngành phải là giáo viên trong trường thuộc ngành này và tài khoản đang hoạt động", HttpStatus.BAD_REQUEST),
+    ACCOUNT_ALREADY_HEAD_OF_OTHER_MAJOR(3017, "Tài khoản này đang là Trưởng ngành của ngành khác", HttpStatus.CONFLICT),
+    MAJOR_NOT_IN_SCOPE(3018, "Bạn không có quyền thao tác trên ngành này", HttpStatus.FORBIDDEN),
+    TEACHER_MANAGED_BY_OTHER_MAJOR(3019, "Giáo viên thuộc ngành khác, bạn không có quyền cập nhật", HttpStatus.FORBIDDEN),
 
     ;
     private int code;

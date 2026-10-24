@@ -26,7 +26,9 @@ import com.example.tlu_gpms_system.features.account.repository.RoleRepository;
 import com.example.tlu_gpms_system.features.account.repository.StudentRepository;
 import com.example.tlu_gpms_system.features.account.repository.TeacherRepository;
 import com.example.tlu_gpms_system.features.faculty.entity.Major;
-import com.example.tlu_gpms_system.features.faculty.repository.MajorRepository;
+import com.example.tlu_gpms_system.features.faculty.service.MajorService;
+import com.example.tlu_gpms_system.features.faculty.service.scope.MajorScope;
+import com.example.tlu_gpms_system.features.faculty.service.scope.MajorScopeResolver;
 import com.example.tlu_gpms_system.testreport.UnitTestCase;
 import com.example.tlu_gpms_system.testreport.UnitTestCase.Type;
 import com.example.tlu_gpms_system.testreport.UtcReportExtension;
@@ -86,10 +88,13 @@ class UserServiceImplTest {
     private AccountRepository accountRepository;
 
     @Mock
-    private MajorRepository majorRepository;
+    private MajorService majorService;
 
     @Mock
     private RoleRepository roleRepository;
+
+    @Mock
+    private MajorScopeResolver majorScopeResolver;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -108,9 +113,11 @@ class UserServiceImplTest {
         studentRole.setName("STUDENT");
         supervisorRole = new Role();
         supervisorRole.setName("SUPERVISOR");
-        lenient().when(majorRepository.findAll()).thenReturn(List.of(major));
+        lenient().when(majorService.getAllMajorEntities()).thenReturn(List.of(major));
         lenient().when(roleRepository.findById("STUDENT")).thenReturn(Optional.of(studentRole));
         lenient().when(roleRepository.findById("SUPERVISOR")).thenReturn(Optional.of(supervisorRole));
+        // Mặc định người gọi là Admin (mọi ngành); case phạm vi ngành tự stub lại
+        lenient().when(majorScopeResolver.current()).thenReturn(MajorScope.allMajors());
     }
 
     // ===================== Helper chung =====================
@@ -143,19 +150,19 @@ class UserServiceImplTest {
     // Gọi service rồi lấy Pageable thực sự truyền xuống repository
     private Pageable capturedPageable(String keyword, String batch, UUID major, AccountStatusFilter status,
                                       Pageable pageable) {
-        when(studentRepository.findAllStudents(any(), any(), any(), any(), any())).thenReturn(Page.empty());
+        when(studentRepository.findAllStudents(any(), any(), any(), any(), eq(true), any(), any())).thenReturn(Page.empty());
         userService.getAllStudents(keyword, batch, major, status, pageable);
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(studentRepository).findAllStudents(any(), any(), any(), any(), captor.capture());
+        verify(studentRepository).findAllStudents(any(), any(), any(), any(), eq(true), any(), captor.capture());
         return captor.getValue();
     }
 
     // Gọi service rồi lấy Pageable thực sự truyền xuống repository (danh sách giáo viên)
     private Pageable capturedTeacherPageable(String name, String organizationType, String majorName, Pageable pageable) {
-        when(teacherRepository.findAllTeachers(any(), any(), any(), any())).thenReturn(Page.empty());
+        when(teacherRepository.findAllTeachers(any(), any(), any(), eq(true), any(), any())).thenReturn(Page.empty());
         userService.getAllTeachers(name, organizationType, majorName, pageable);
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(teacherRepository).findAllTeachers(any(), any(), any(), captor.capture());
+        verify(teacherRepository).findAllTeachers(any(), any(), any(), eq(true), any(), captor.capture());
         return captor.getValue();
     }
 
@@ -370,7 +377,7 @@ class UserServiceImplTest {
                 .studentCode("2251172489").name("Lê Trung Đức").majorName("Kỹ thuật phần mềm")
                 .className("63KTPM1").status(true).build();
         when(studentRepository.findAllStudents(eq("Lê Trung Đức"), eq("K63"), eq(majorId),
-                eq(true), any())).thenReturn(new PageImpl<>(List.of(student)));
+                eq(true), eq(true), any(), any())).thenReturn(new PageImpl<>(List.of(student)));
 
         Page<StudentResponse> result = userService.getAllStudents("  Lê   Trung Đức ", " k63 ", majorId,
                 AccountStatusFilter.ACTIVE, PageRequest.of(0, 15));
@@ -387,7 +394,7 @@ class UserServiceImplTest {
     void UTC002_getAllStudents_blankFilters_passNullToRepository() {
         capturedPageable("   ", "", null, AccountStatusFilter.ACTIVE, PageRequest.of(0, 15));
 
-        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(true), any());
+        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(true), eq(true), any(), any());
     }
 
     @Test
@@ -396,15 +403,15 @@ class UserServiceImplTest {
             input = "Gọi 3 lần với status = INACTIVE; status = ALL; status = null",
             returns = "Tham số status truyền xuống repository lần lượt: false; null; true (mặc định ACTIVE)")
     void UTC003_getAllStudents_statusFilters_mappedToBoolean() {
-        when(studentRepository.findAllStudents(any(), any(), any(), any(), any())).thenReturn(Page.empty());
+        when(studentRepository.findAllStudents(any(), any(), any(), any(), eq(true), any(), any())).thenReturn(Page.empty());
 
         userService.getAllStudents(null, null, null, AccountStatusFilter.INACTIVE, PageRequest.of(0, 15));
         userService.getAllStudents(null, null, null, AccountStatusFilter.ALL, PageRequest.of(0, 15));
         userService.getAllStudents(null, null, null, null, PageRequest.of(0, 15));
 
-        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(false), any());
-        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), isNull(), any());
-        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(true), any());
+        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(false), eq(true), any(), any());
+        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), isNull(), eq(true), any(), any());
+        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(true), eq(true), any(), any());
     }
 
     @Test
@@ -486,7 +493,7 @@ class UserServiceImplTest {
                 .publicId(publicId).studentCode("2251172489").name("Lê Trung Đức")
                 .email("2251172489@gmail.com").phone("0911111111").majorName("Kỹ thuật phần mềm")
                 .className("63KTPM1").batch("K63").status(true).build();
-        when(studentRepository.findStudentDetail(publicId)).thenReturn(Optional.of(detail));
+        when(studentRepository.findStudentDetail(eq(publicId), eq(true), any())).thenReturn(Optional.of(detail));
 
         StudentDetailResponse result = userService.getStudentDetail(publicId.toString());
 
@@ -501,7 +508,7 @@ class UserServiceImplTest {
             input = "publicId = <uuid không có trong DB>",
             exception = "AppException: STUDENT_NOT_FOUND (\"Sinh viên không tồn tại\")")
     void UTC010_getStudentDetail_notFound_throwAppException() {
-        when(studentRepository.findStudentDetail(publicId)).thenReturn(Optional.empty());
+        when(studentRepository.findStudentDetail(eq(publicId), eq(true), any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.getStudentDetail(publicId.toString()))
                 .isInstanceOf(AppException.class)
@@ -544,7 +551,7 @@ class UserServiceImplTest {
                 .build();
 
         Page<TeacherResponse> expectedPage = new PageImpl<>(List.of(teacher), pageable, 1);
-        when(teacherRepository.findAllTeachers(eq("Trần Văn Nam"), eq(true), eq(majorName), any()))
+        when(teacherRepository.findAllTeachers(eq("Trần Văn Nam"), eq(true), eq(majorName), eq(true), any(), any()))
                 .thenReturn(expectedPage);
 
         Page<TeacherResponse> result = userService.getAllTeachers("  Trần   Văn Nam ", " Internal",
@@ -565,7 +572,7 @@ class UserServiceImplTest {
     void UTC101_getAllTeachers_blankFilters_passNullToRepository() {
         capturedTeacherPageable("   ", "", null, PageRequest.of(0, 10));
 
-        verify(teacherRepository).findAllTeachers(isNull(), isNull(), isNull(), any());
+        verify(teacherRepository).findAllTeachers(isNull(), isNull(), isNull(), eq(true), any(), any());
     }
 
     @Test
@@ -630,7 +637,7 @@ class UserServiceImplTest {
     void UTC114_getAllTeachers_externalType_passInternalFalse() {
         capturedTeacherPageable(null, "external", null, PageRequest.of(0, 10));
 
-        verify(teacherRepository).findAllTeachers(isNull(), eq(false), isNull(), any());
+        verify(teacherRepository).findAllTeachers(isNull(), eq(false), isNull(), eq(true), any(), any());
     }
 
     @Test
@@ -658,7 +665,7 @@ class UserServiceImplTest {
         TeacherDetailResponse detail = TeacherDetailResponse.builder()
                 .publicId(publicId).name("Nguyễn Văn An").email("annv@tlu.edu.vn").phone("0912345678")
                 .organization(TLU_NAME).majorName("Kỹ thuật phần mềm").amount(20L).status(true).build();
-        when(teacherRepository.findTeacherDetail(publicId)).thenReturn(Optional.of(detail));
+        when(teacherRepository.findTeacherDetail(eq(publicId), eq(true), any())).thenReturn(Optional.of(detail));
 
         TeacherDetailResponse result = userService.getTeacherDetail(publicId.toString());
 
@@ -674,7 +681,7 @@ class UserServiceImplTest {
             input = "publicId = <uuid không có trong DB>",
             exception = "AppException: TEACHER_NOT_FOUND (\"Giáo viên không tồn tại\")")
     void UTC099_getTeacherDetail_notFound_throwAppException() {
-        when(teacherRepository.findTeacherDetail(publicId)).thenReturn(Optional.empty());
+        when(teacherRepository.findTeacherDetail(eq(publicId), eq(true), any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.getTeacherDetail(publicId.toString()))
                 .isInstanceOf(AppException.class)
@@ -741,7 +748,7 @@ class UserServiceImplTest {
 
     @Test
     @UnitTestCase(id = "UTC017", method = "createStudent", type = Type.ABNORMAL,
-            precondition = "majorRepository.findAll trả về 1 ngành \"Kỹ thuật phần mềm\" (7480103)",
+            precondition = "majorService.getAllMajorEntities trả về 1 ngành \"Kỹ thuật phần mềm\" (7480103)",
             input = "request = {major: \"Ngành không tồn tại\", các trường khác hợp lệ}",
             exception = "AppException: MAJOR_INVALID (\"Ngành học không tồn tại trong hệ thống\")")
     void UTC017_createStudent_majorUnknown_throwAppException() {
@@ -1393,7 +1400,7 @@ class UserServiceImplTest {
 
     @Test
     @UnitTestCase(id = "UTC054", method = "createTeacher", type = Type.ABNORMAL,
-            precondition = "majorRepository.findAll trả về 1 ngành \"Kỹ thuật phần mềm\" (7480103)",
+            precondition = "majorService.getAllMajorEntities trả về 1 ngành \"Kỹ thuật phần mềm\" (7480103)",
             input = "request = {major: \"Ngành không tồn tại\", các trường khác hợp lệ}",
             exception = "AppException: MAJOR_INVALID (\"Ngành học không tồn tại trong hệ thống\")")
     void UTC054_createTeacher_majorUnknown_throwAppException() {
@@ -1517,12 +1524,12 @@ class UserServiceImplTest {
 
     @Test
     @UnitTestCase(id = "UTC061", method = "createTeacher", type = Type.NORMAL,
-            precondition = "DB có Trưởng bộ môn (role HEAD_OF_DEPARTMENT) email annv@tlu.edu.vn, có hồ sơ giáo viên, đang hoạt động",
+            precondition = "DB có Trưởng ngành (role HEAD_OF_MAJOR) email annv@tlu.edu.vn, có hồ sơ giáo viên, đang hoạt động",
             input = "request = {email: \"annv@tlu.edu.vn\", các trường khác hợp lệ}",
             returns = "code = 1100 (TEACHER_ALREADY_ACTIVE)")
-    void UTC061_createTeacher_activeHeadOfDepartment_warnAlreadyActive() {
+    void UTC061_createTeacher_activeHeadOfMajor_warnAlreadyActive() {
         Role hodRole = new Role();
-        hodRole.setName("HEAD_OF_DEPARTMENT");
+        hodRole.setName("HEAD_OF_MAJOR");
         givenExistingTeacher(existingTeacher(true, hodRole));
 
         assertThat(userService.createTeacher(validTeacherRequest().build()).getCode())
@@ -1571,13 +1578,13 @@ class UserServiceImplTest {
 
     @Test
     @UnitTestCase(id = "UTC064", method = "createTeacher", type = Type.NORMAL,
-            precondition = "majorRepository.findAll trả về 2 ngành (Kỹ thuật phần mềm, Hệ thống thông tin); DB có giáo viên annv@tlu.edu.vn đã tắt, ngành Kỹ thuật phần mềm",
+            precondition = "majorService.getAllMajorEntities trả về 2 ngành (Kỹ thuật phần mềm, Hệ thống thông tin); DB có giáo viên annv@tlu.edu.vn đã tắt, ngành Kỹ thuật phần mềm",
             input = "request = {phone: \"0911111111\", amount: 15, major: \"Hệ thống thông tin\", các trường khác khớp DB}",
             returns = "code = 1000; Teacher đổi sang ngành Hệ thống thông tin",
             log = "Đã kích hoạt lại và cập nhật: Ngành")
     void UTC064_createTeacher_inactiveAndMajorChanged_reportMajor() {
         Major otherMajor = Major.builder().id(2L).name("Hệ thống thông tin").code("7480104").build();
-        when(majorRepository.findAll()).thenReturn(List.of(major, otherMajor));
+        when(majorService.getAllMajorEntities()).thenReturn(List.of(major, otherMajor));
         Teacher teacher = existingTeacher(false, supervisorRole);
         givenExistingTeacher(teacher);
 
@@ -1589,13 +1596,18 @@ class UserServiceImplTest {
     }
 
     @Test
-    @UnitTestCase(id = "UTC106", method = "createTeacher", type = Type.ABNORMAL,
+    @UnitTestCase(id = "UTC106", method = "createTeacher", type = Type.NORMAL,
+            precondition = "Người gọi có phạm vi mọi ngành (Admin); email chưa có trong DB",
             input = "request = {email: \"an.nguyen@gmail.com\", organization: \"Trường Đại học Bách khoa Hà Nội\", major: \"Kỹ thuật phần mềm\", các trường khác hợp lệ}",
-            exception = "AppException: MAJOR_NOT_ALLOWED (\"Giáo viên ngoài trường không được điền ngành\"); không truy vấn DB")
-    void UTC106_createTeacher_externalWithMajor_throwMajorNotAllowed() {
-        assertTeacherError(validTeacherRequest().email(EXTERNAL_EMAIL).organization(OTHER_SCHOOL).build(),
-                ErrorCode.MAJOR_NOT_ALLOWED);
-        verify(accountRepository, never()).findAllByEmailIn(any());
+            returns = "code = 1000; Teacher lưu major = null (giáo viên ngoài trường không có ngành, ô ngành bị bỏ qua)")
+    void UTC106_createTeacher_externalWithMajor_ignoreMajor() {
+        givenNoAccountInDb();
+
+        TeacherCreationResult result = userService.createTeacher(
+                validTeacherRequest().email(EXTERNAL_EMAIL).organization(OTHER_SCHOOL).build());
+
+        assertThat(result.getCode()).isEqualTo(1000);
+        assertThat(capturedTeachers().get(0).getMajor()).isNull();
     }
 
     @Test
@@ -1734,12 +1746,12 @@ class UserServiceImplTest {
 
     @Test
     @UnitTestCase(id = "UTC069", method = "activateTeacher", type = Type.NORMAL,
-            precondition = "teacherRepository.findByPublicId trả về Trưởng bộ môn (role HEAD_OF_DEPARTMENT) đã tắt",
+            precondition = "teacherRepository.findByPublicId trả về Trưởng ngành (role HEAD_OF_MAJOR) đã tắt",
             input = "publicId = <uuid giáo viên>",
-            returns = "true; role giữ nguyên HEAD_OF_DEPARTMENT")
-    void UTC069_activateTeacher_inactiveHeadOfDepartment_activateKeepRole() {
+            returns = "true; role giữ nguyên HEAD_OF_MAJOR")
+    void UTC069_activateTeacher_inactiveHeadOfMajor_activateKeepRole() {
         Role hodRole = new Role();
-        hodRole.setName("HEAD_OF_DEPARTMENT");
+        hodRole.setName("HEAD_OF_MAJOR");
         Teacher teacher = existingTeacher(false, hodRole);
         when(teacherRepository.findByPublicId(publicId)).thenReturn(Optional.of(teacher));
 
@@ -2169,5 +2181,302 @@ class UserServiceImplTest {
         assertThat(account.getStatus()).isTrue();
         assertThat(teacher.getMajor()).isNull();
         assertThat(capturedTeachers()).containsExactly(teacher);
+    }
+
+    // ===================== Phạm vi ngành (Trưởng ngành) =====================
+
+    // Ngành ngoài phạm vi của Trưởng ngành Kỹ thuật phần mềm (id 1)
+    private Major otherMajor() {
+        return Major.builder().id(2L).code("7480104").name("Hệ thống thông tin").build();
+    }
+
+    // Người gọi là Trưởng ngành phụ trách các ngành có id truyền vào (không truyền id = đã bị gỡ khỏi ngành)
+    private void givenHeadOfMajor(Long... majorIds) {
+        when(majorScopeResolver.current()).thenReturn(MajorScope.of(Set.of(majorIds)));
+    }
+
+    // ===== Phạm vi ngành: createStudent / importStudents =====
+
+    @Test
+    @UnitTestCase(id = "UTC121", method = "createStudent", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; danh mục có 2 ngành (Kỹ thuật phần mềm, Hệ thống thông tin)",
+            input = "request = {major: \"Hệ thống thông tin\", các trường khác hợp lệ}",
+            exception = "AppException: MAJOR_NOT_IN_SCOPE (\"Bạn không có quyền thao tác trên ngành này\"); không đối chiếu DB, không lưu")
+    void UTC121_createStudent_majorOutOfScope_throwAppException() {
+        givenHeadOfMajor(1L);
+        when(majorService.getAllMajorEntities()).thenReturn(List.of(major, otherMajor()));
+
+        assertError(validRequest().major("Hệ thống thông tin").build(), ErrorCode.MAJOR_NOT_IN_SCOPE);
+        verify(studentRepository, never()).findAllByStudentCodeIn(anyCollection());
+        verify(studentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC122", method = "createStudent", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành nhưng đã bị gỡ khỏi ngành (phạm vi rỗng)",
+            input = "request = {các trường hợp lệ}",
+            exception = "AppException: MAJOR_NOT_IN_SCOPE (\"Bạn không có quyền thao tác trên ngành này\"); không đọc danh mục ngành")
+    void UTC122_createStudent_emptyScope_throwAppException() {
+        givenHeadOfMajor();
+
+        assertError(validRequest().build(), ErrorCode.MAJOR_NOT_IN_SCOPE);
+        verify(majorService, never()).getAllMajorEntities();
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC123", method = "createStudent", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm",
+            input = "request = {major: \"Ngành không tồn tại\", các trường khác hợp lệ}",
+            exception = "AppException: MAJOR_INVALID (\"Ngành học không tồn tại trong hệ thống\"); ngành sai danh mục báo trước, không báo phạm vi")
+    void UTC123_createStudent_unknownMajorForHead_throwMajorInvalid() {
+        givenHeadOfMajor(1L);
+
+        assertError(validRequest().major("Ngành không tồn tại").build(), ErrorCode.MAJOR_INVALID);
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC124", method = "importStudents", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; danh mục có 2 ngành; DB chưa có mã SV, email nào trong file",
+            input = "file students.xlsx: dòng 2 hợp lệ ngành Kỹ thuật phần mềm (2251172489); dòng 3 hợp lệ nhưng ngành Hệ thống thông tin (2251172518)",
+            returns = "totalRows = 2, successCount = 1, errorCount = 1; chỉ lưu sinh viên 2251172489",
+            log = "Dòng 2: Thêm sinh viên thành công; dòng 3: Bạn không có quyền thao tác trên ngành này")
+    void UTC124_importStudents_rowOutOfScope_rejectOnlyThatRow() throws IOException {
+        givenHeadOfMajor(1L);
+        when(majorService.getAllMajorEntities()).thenReturn(List.of(major, otherMajor()));
+        givenNothingInDb();
+        MockMultipartFile file = buildStudentExcel(sheet -> {
+            writeRow(sheet, 1, validRow("2251172489", "a@gmail.com", "0987654321"));
+            writeRow(sheet, 2, "2251172518", "Nguyễn", "Hạnh", "b@gmail.com", "0987654322", "K64", "64HTTT1", "Hệ thống thông tin");
+        });
+
+        StudentImportResponse response = userService.importStudents(file);
+
+        assertThat(response.getTotalRows()).isEqualTo(2);
+        assertThat(response.getSuccessCount()).isEqualTo(1);
+        assertThat(response.getErrorCount()).isEqualTo(1);
+        List<StudentImportRowResult> results = response.getRowResults();
+        assertThat(results.get(0).getStatus()).isEqualTo(RowImportStatus.SUCCESS);
+        assertThat(results.get(1).getStatus()).isEqualTo(RowImportStatus.ERROR);
+        assertThat(results.get(1).getMessage()).isEqualTo(ErrorCode.MAJOR_NOT_IN_SCOPE.getMessage());
+        assertThat(capturedStudents()).extracting(Student::getStudentCode).containsExactly("2251172489");
+    }
+
+    // ===== Phạm vi ngành: createTeacher / importTeachers =====
+
+    @Test
+    @UnitTestCase(id = "UTC125", method = "createTeacher", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; email chưa có trong DB",
+            input = "request = {email: \"an.nguyen@gmail.com\", organization: \"Trường Đại học Bách khoa Hà Nội\", major: \"\", các trường khác hợp lệ}",
+            returns = "code = 1000; Teacher lưu major = null (giáo viên ngoài trường không có ngành), amount = 10",
+            log = "Thêm giáo viên thành công")
+    void UTC125_createTeacher_externalWithoutMajorByHead_saveNullMajor() {
+        givenHeadOfMajor(1L);
+        givenNoAccountInDb();
+
+        TeacherCreationResult result = userService.createTeacher(validTeacherRequest()
+                .email(EXTERNAL_EMAIL).organization(OTHER_SCHOOL).major("").build());
+
+        assertTeacherResult(result, 1000, "Thêm giáo viên thành công");
+        Teacher teacher = capturedTeachers().get(0);
+        assertThat(teacher.getMajor()).isNull();
+        assertThat(teacher.getAmount()).isEqualTo(10L);
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC126", method = "createTeacher", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; danh mục có 2 ngành (Kỹ thuật phần mềm, Hệ thống thông tin)",
+            input = "request = {email: \"annv@tlu.edu.vn\", major: \"Hệ thống thông tin\", các trường khác hợp lệ}",
+            exception = "AppException: MAJOR_NOT_IN_SCOPE (\"Bạn không có quyền thao tác trên ngành này\"); không lưu")
+    void UTC126_createTeacher_internalMajorOutOfScope_throwAppException() {
+        givenHeadOfMajor(1L);
+        when(majorService.getAllMajorEntities()).thenReturn(List.of(major, otherMajor()));
+
+        assertTeacherError(validTeacherRequest().major("Hệ thống thông tin").build(), ErrorCode.MAJOR_NOT_IN_SCOPE);
+        verify(teacherRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC127", method = "createTeacher", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; DB có giáo viên annv@tlu.edu.vn đã bị tắt, thuộc ngành Hệ thống thông tin",
+            input = "request = {email: \"annv@tlu.edu.vn\", major: \"Kỹ thuật phần mềm\", các trường khác khớp DB}",
+            exception = "AppException: TEACHER_MANAGED_BY_OTHER_MAJOR (\"Giáo viên thuộc ngành khác, bạn không có quyền cập nhật\"); giáo viên vẫn tắt, giữ ngành Hệ thống thông tin, không lưu")
+    void UTC127_createTeacher_reactivateTeacherOfOtherMajor_throwAppException() {
+        givenHeadOfMajor(1L);
+        Major otherMajor = otherMajor();
+        Teacher teacher = existingTeacher(false, supervisorRole);
+        teacher.setMajor(otherMajor);
+        givenExistingTeacher(teacher);
+
+        assertTeacherError(validTeacherRequest().build(), ErrorCode.TEACHER_MANAGED_BY_OTHER_MAJOR);
+        assertThat(teacher.getAccount().getStatus()).isFalse();
+        assertThat(teacher.getMajor()).isSameAs(otherMajor);
+        verify(teacherRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC128", method = "createTeacher", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; DB có giáo viên ngoài trường an.nguyen@gmail.com đã bị tắt, major = null (Admin import), amount 15, SĐT 0911111111",
+            input = "request = {email: \"an.nguyen@gmail.com\", organization: \"Trường Đại học Bách khoa Hà Nội\", major: \"\", phone: \"0911111111\", amount: 15}",
+            returns = "code = 1000; Account status = true; Teacher giữ major = null (không có trường nào thay đổi); lưu Teacher",
+            log = "Đã kích hoạt lại tài khoản giáo viên")
+    void UTC128_createTeacher_reactivateExternalWithoutMajorByHead_keepNullMajor() {
+        givenHeadOfMajor(1L);
+        Teacher teacher = existingTeacher(false, supervisorRole);
+        teacher.getAccount().setEmail(EXTERNAL_EMAIL);
+        teacher.setOrganization(OTHER_SCHOOL);
+        teacher.setMajor(null);
+        givenExistingTeacher(teacher);
+
+        TeacherCreationResult result = userService.createTeacher(validTeacherRequest()
+                .email(EXTERNAL_EMAIL).organization(OTHER_SCHOOL).major("").phone("0911111111").amount("15").build());
+
+        assertTeacherResult(result, 1000, "Đã kích hoạt lại tài khoản giáo viên");
+        assertThat(teacher.getAccount().getStatus()).isTrue();
+        assertThat(teacher.getMajor()).isNull();
+        assertThat(capturedTeachers()).containsExactly(teacher);
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC129", method = "importTeachers", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; danh mục có 2 ngành; DB chưa có email nào trong file",
+            input = "file teachers.xlsx: dòng 2 trong trường annv@tlu.edu.vn ngành Kỹ thuật phần mềm; dòng 3 trong trường binh@tlu.edu.vn ngành Hệ thống thông tin; dòng 4 ngoài trường an.nguyen@gmail.com ngành trống",
+            returns = "Dòng 2, 4 SUCCESS, dòng 3 ERROR; lưu 2 giáo viên: dòng 2 ngành Kỹ thuật phần mềm, dòng 4 (ngoài trường) major = null",
+            log = "Dòng 3: Bạn không có quyền thao tác trên ngành này")
+    void UTC129_importTeachers_rowOutOfScope_rejectRowAndSaveExternalWithoutMajor() throws IOException {
+        givenHeadOfMajor(1L);
+        when(majorService.getAllMajorEntities()).thenReturn(List.of(major, otherMajor()));
+        givenNoAccountInDb();
+        MockMultipartFile file = buildTeacherExcel(sheet -> {
+            writeRow(sheet, 1, internalRow(INTERNAL_EMAIL, "0987654321"));
+            writeRow(sheet, 2, "Lê Văn", "Bình", "binh@tlu.edu.vn", "0987654322", TLU_NAME, "Hệ thống thông tin");
+            writeRow(sheet, 3, externalRow(EXTERNAL_EMAIL, "0912345678"));
+        });
+
+        TeacherImportResponse response = userService.importTeachers(file);
+
+        assertThat(response.getSuccessCount()).isEqualTo(2);
+        assertThat(response.getErrorCount()).isEqualTo(1);
+        List<TeacherImportRowResult> results = response.getRowResults();
+        assertThat(results).extracting(TeacherImportRowResult::getStatus)
+                .containsExactly(RowImportStatus.SUCCESS, RowImportStatus.ERROR, RowImportStatus.SUCCESS);
+        assertThat(results.get(1).getMessage()).isEqualTo(ErrorCode.MAJOR_NOT_IN_SCOPE.getMessage());
+        assertThat(capturedTeachers()).extracting(Teacher::getMajor).containsExactly(major, null);
+    }
+
+    // ===== Phạm vi ngành: danh sách / chi tiết =====
+
+    @Test
+    @UnitTestCase(id = "UTC130", method = "getAllStudents", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm (id 1); studentRepository.findAllStudents trả về trang rỗng",
+            input = "keyword = null; batch = null; majorId = null; status = ACTIVE; pageable = page 0, size 10",
+            returns = "Gọi studentRepository.findAllStudents(..., allMajors = false, majorIds = [1], pageable) - chỉ lấy sinh viên ngành mình")
+    void UTC130_getAllStudents_headOfMajor_filterByOwnMajor() {
+        givenHeadOfMajor(1L);
+        when(studentRepository.findAllStudents(any(), any(), any(), any(), anyBoolean(), any(), any())).thenReturn(Page.empty());
+
+        userService.getAllStudents(null, null, null, AccountStatusFilter.ACTIVE, PageRequest.of(0, 10));
+
+        verify(studentRepository).findAllStudents(isNull(), isNull(), isNull(), eq(true), eq(false), eq(Set.of(1L)), any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC131", method = "getAllTeachers", type = Type.BOUNDARY,
+            precondition = "Người gọi là Trưởng ngành đã bị gỡ khỏi ngành (phạm vi rỗng); teacherRepository.findAllTeachers trả về trang rỗng",
+            input = "name = null; organizationType = null; majorName = null; pageable = page 0, size 10",
+            returns = "Gọi teacherRepository.findAllTeachers(..., allMajors = false, majorIds = [-1], pageable) - không khớp ngành nào, không ném lỗi")
+    void UTC131_getAllTeachers_emptyScope_passPlaceholderId() {
+        givenHeadOfMajor();
+        when(teacherRepository.findAllTeachers(any(), any(), any(), anyBoolean(), any(), any())).thenReturn(Page.empty());
+
+        userService.getAllTeachers(null, null, null, PageRequest.of(0, 10));
+
+        verify(teacherRepository).findAllTeachers(isNull(), isNull(), isNull(), eq(false), eq(Set.of(-1L)), any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC132", method = "getStudentDetail", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; studentRepository.findStudentDetail(publicId, false, [1]) trả về Optional.empty() (sinh viên thuộc ngành khác)",
+            input = "publicId = <uuid sinh viên ngành Hệ thống thông tin>",
+            exception = "AppException: STUDENT_NOT_FOUND (\"Sinh viên không tồn tại\"); không lộ dữ liệu ngành khác")
+    void UTC132_getStudentDetail_otherMajor_throwNotFound() {
+        givenHeadOfMajor(1L);
+        when(studentRepository.findStudentDetail(eq(publicId), eq(false), eq(Set.of(1L)))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getStudentDetail(publicId.toString()))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STUDENT_NOT_FOUND);
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC133", method = "getTeacherDetail", type = Type.ABNORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; teacherRepository.findTeacherDetail(publicId, false, [1]) trả về Optional.empty() (giáo viên ngành khác hoặc chưa có ngành)",
+            input = "publicId = <uuid giáo viên ngoài phạm vi>",
+            exception = "AppException: TEACHER_NOT_FOUND (\"Giáo viên không tồn tại\")")
+    void UTC133_getTeacherDetail_outOfScope_throwNotFound() {
+        givenHeadOfMajor(1L);
+        when(teacherRepository.findTeacherDetail(eq(publicId), eq(false), eq(Set.of(1L)))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getTeacherDetail(publicId.toString()))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.TEACHER_NOT_FOUND);
+    }
+
+    // ===== Phạm vi ngành: activate / updateTeacherAmount (chặn IDOR) =====
+
+    @Test
+    @UnitTestCase(id = "UTC134", method = "activateStudent", type = Type.ABNORMAL,
+            precondition = "studentRepository.findByPublicId trả về sinh viên đã tắt thuộc ngành Hệ thống thông tin; majorScopeResolver.requireAllows(ngành đó) ném MAJOR_NOT_IN_SCOPE",
+            input = "publicId = <uuid sinh viên ngành khác>",
+            exception = "AppException: MAJOR_NOT_IN_SCOPE (\"Bạn không có quyền thao tác trên ngành này\"); sinh viên vẫn tắt, không lưu")
+    void UTC134_activateStudent_otherMajor_throwAppException() {
+        Major otherMajor = otherMajor();
+        Student student = existingStudent(false, false);
+        student.setMajor(otherMajor);
+        when(studentRepository.findByPublicId(publicId)).thenReturn(Optional.of(student));
+        doThrow(new AppException(ErrorCode.MAJOR_NOT_IN_SCOPE)).when(majorScopeResolver).requireAllows(otherMajor);
+
+        assertThatThrownBy(() -> userService.activateStudent(publicId.toString()))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.MAJOR_NOT_IN_SCOPE);
+        assertThat(student.getStatus()).isFalse();
+        verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC135", method = "activateTeacher", type = Type.NORMAL,
+            precondition = "Người gọi là Trưởng ngành Kỹ thuật phần mềm; teacherRepository.findByPublicId trả về giáo viên ngoài trường an.nguyen@gmail.com đã tắt, major = null",
+            input = "publicId = <uuid giáo viên chưa có ngành>",
+            returns = "true; Account status = true; lưu Teacher (giáo viên chưa có ngành dùng chung cho mọi Trưởng ngành)")
+    void UTC135_activateTeacher_withoutMajorByHead_activate() {
+        givenHeadOfMajor(1L);
+        Teacher teacher = existingTeacher(false, supervisorRole);
+        teacher.getAccount().setEmail(EXTERNAL_EMAIL);
+        teacher.setOrganization(OTHER_SCHOOL);
+        teacher.setMajor(null);
+        when(teacherRepository.findByPublicId(publicId)).thenReturn(Optional.of(teacher));
+
+        assertThat(userService.activateTeacher(publicId.toString())).isTrue();
+        assertThat(teacher.getAccount().getStatus()).isTrue();
+        verify(teacherRepository).save(teacher);
+    }
+
+    @Test
+    @UnitTestCase(id = "UTC136", method = "updateTeacherAmount", type = Type.ABNORMAL,
+            precondition = "teacherRepository.findByPublicId trả về giáo viên đang hoạt động thuộc ngành Hệ thống thông tin, amount 15; majorScopeResolver.requireAllows(ngành đó) ném MAJOR_NOT_IN_SCOPE",
+            input = "publicId = <uuid giáo viên ngành khác>, request = {amount: \"30\"}",
+            exception = "AppException: MAJOR_NOT_IN_SCOPE (\"Bạn không có quyền thao tác trên ngành này\"); amount giữ 15, không lưu")
+    void UTC136_updateTeacherAmount_otherMajor_throwAppException() {
+        Major otherMajor = otherMajor();
+        Teacher teacher = existingTeacher(true, supervisorRole);
+        teacher.setMajor(otherMajor);
+        when(teacherRepository.findByPublicId(publicId)).thenReturn(Optional.of(teacher));
+        doThrow(new AppException(ErrorCode.MAJOR_NOT_IN_SCOPE)).when(majorScopeResolver).requireAllows(otherMajor);
+
+        assertUpdateAmountError(publicId.toString(), "30", ErrorCode.MAJOR_NOT_IN_SCOPE);
+        assertThat(teacher.getAmount()).isEqualTo(15L);
+        verify(teacherRepository, never()).save(any());
     }
 }

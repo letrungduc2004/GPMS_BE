@@ -1,7 +1,6 @@
 package com.example.tlu_gpms_system.features.faculty.entity;
 
 import com.example.tlu_gpms_system.common.enums.ActiveStatus;
-import com.example.tlu_gpms_system.features.account.entity.Account;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,10 +35,6 @@ public class Faculty {
 
     @Column(name = "name", nullable = false, unique = true)
     String name;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "head_of_department_id")
-    Account headOfDepartment;
 
     @Column(name = "description", columnDefinition = "TEXT")
     String description;

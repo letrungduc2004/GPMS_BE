@@ -1,17 +1,22 @@
        
-INSERT INTO faculty (public_id, name)
-VALUES (UUID_TO_BIN(UUID()), 'Công nghệ Thông tin');
+-- Khoa không còn Trưởng khoa (đã bỏ cột head_of_department_id)
+INSERT INTO faculty (
+    public_id, code, name, description, status, created_at, updated_at
+) VALUES
+    (UUID_TO_BIN(UUID()), 'CNTT', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin', 'ACTIVE', NOW(), NULL);
 
-INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'Kỹ thuật phần mềm', 1);
-INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'Hệ thống thông tin', 1);
-INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'Công nghệ thông tin', 1);
-INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'An ninh mạng', 1);
-INSERT INTO major (public_id, name, faculty_id)
-VALUES (UUID_TO_BIN(UUID()), 'Trí tuệ nhân tạo và Khoa học dữ liệu', 1);
+-- head_account_id (Trưởng ngành) để NULL, Admin gán sau qua API gán trưởng ngành
+-- (hoặc chạy seed trưởng ngành ở mục 5)
+
+INSERT INTO major (
+    public_id, code, name, description, status, faculty_id, created_at, updated_at
+) VALUES
+    (UUID_TO_BIN(UUID()), 'KTPM01', 'Kỹ thuật phần mềm', 'Ngành đào tạo kỹ sư phần mềm', 'ACTIVE', 1, NOW(), NULL),
+    (UUID_TO_BIN(UUID()), 'HTTT01', 'Hệ thống thông tin', 'Ngành đào tạo chuyên gia hệ thống thông tin', 'ACTIVE', 1, NOW(), NULL),
+    (UUID_TO_BIN(UUID()), 'CNTT01', 'Công nghệ thông tin', 'Ngành đào tạo chuyên sâu CNTT', 'ACTIVE', 1, NOW(), NULL),
+    (UUID_TO_BIN(UUID()), 'ANM01', 'An ninh mạng', 'Ngành đào tạo chuyên gia bảo mật và an toàn thông tin', 'ACTIVE', 1, NOW(), NULL),
+    (UUID_TO_BIN(UUID()), 'AI01', 'Trí tuệ nhân tạo và Khoa học dữ liệu', 'Ngành đào tạo AI & Data Science', 'ACTIVE', 1, NOW(), NULL);
+
 
 -- =====================================================================
 -- Seed dữ liệu: permission, role, role_permission
@@ -38,7 +43,21 @@ INSERT INTO permission (name, description) VALUES
 ('UPDATE_SEMESTER', 'Sửa học kỳ'),
 ('VIEW_MAJOR', 'Xem danh sách ngành'),
 ('CREATE_MAJOR', 'Thêm ngành'),
+('UPDATE_MAJOR', 'Sửa ngành'),
 ('DELETE_MAJOR', 'Xóa ngành'),
+('ASSIGN_HEAD_OF_MAJOR', 'Gán/thu hồi trưởng ngành cho ngành'),
+-- Admin: phạm vi dữ liệu. Có quyền này = thao tác trên mọi ngành,
+-- không có = chỉ thao tác trên ngành mà mình là trưởng ngành (major.head_account_id)
+('ACCESS_ALL_MAJORS', 'Thao tác dữ liệu sinh viên, giáo viên của tất cả các ngành'),
+
+-- Admin + Trưởng ngành: hồ sơ sinh viên, giáo viên (giới hạn theo ngành phụ trách)
+('VIEW_STUDENT', 'Xem danh sách, chi tiết sinh viên'),
+('IMPORT_STUDENT', 'Import Excel / thêm thủ công sinh viên'),
+('EXPORT_STUDENT', 'Xuất danh sách sinh viên'),
+('UPDATE_STUDENT_STATUS', 'Kích hoạt lại / vô hiệu hóa sinh viên'),
+('IMPORT_TEACHER', 'Import Excel / thêm thủ công giáo viên (trong và ngoài trường)'),
+('EXPORT_TEACHER', 'Xuất danh sách giáo viên'),
+('UPDATE_TEACHER_STATUS', 'Kích hoạt lại / vô hiệu hóa giáo viên'),
 
 -- Sinh viên
 ('VIEW_ADVISOR', 'Xem và tìm kiếm danh sách giáo viên hướng dẫn'),
@@ -52,11 +71,11 @@ INSERT INTO permission (name, description) VALUES
 ('VIEW_DEFENSE_SCHEDULE', 'Xem lịch bảo vệ đồ án'),
 ('VIEW_FINAL_GRADE', 'Xem điểm đồ án'),
 
--- Trưởng bộ môn: tài liệu mẫu
+-- Trưởng ngành: tài liệu mẫu
 ('CREATE_TEMPLATE_DOC', 'Thêm tài liệu mẫu'),
 ('UPDATE_TEMPLATE_DOC', 'Sửa tài liệu mẫu'),
 ('DELETE_TEMPLATE_DOC', 'Xóa tài liệu mẫu'),
--- Trưởng bộ môn: sinh viên, giáo viên
+-- Trưởng ngành: sinh viên, giáo viên
 ('VIEW_PROJECT_STUDENT', 'Xem danh sách sinh viên làm đồ án'),
 ('ADD_PROJECT_STUDENT', 'Thêm sinh viên làm đồ án'),
 ('EXPORT_PROJECT_STUDENT', 'Xuất danh sách sinh viên làm đồ án'),
@@ -65,7 +84,7 @@ INSERT INTO permission (name, description) VALUES
 ('ADD_SEMESTER_TEACHER', 'Thêm giáo viên vào kỳ'),
 ('REMOVE_SEMESTER_TEACHER', 'Xóa giáo viên khỏi kỳ'),
 ('CONFIG_ADVISOR_QUOTA', 'Cài đặt số lượng sinh viên mỗi giáo viên hướng dẫn'),
--- Trưởng bộ môn: lịch trình, tiêu chí, phân công
+-- Trưởng ngành: lịch trình, tiêu chí, phân công
 ('VIEW_SCHEDULE', 'Xem danh sách và chi tiết lịch trình đồ án'),
 ('CREATE_SCHEDULE', 'Thêm lịch trình đồ án'),
 ('UPDATE_SCHEDULE', 'Sửa lịch trình đồ án'),
@@ -73,7 +92,7 @@ INSERT INTO permission (name, description) VALUES
 ('CONFIG_GRADING_CRITERIA', 'Cài đặt tiêu chí chấm điểm (hướng dẫn, phản biện, hội đồng)'),
 ('ASSIGN_ADVISOR', 'Phân công giáo viên hướng dẫn'),
 ('ASSIGN_OUTLINE_REVIEWER', 'Phân công giáo viên nhận xét'),
--- Trưởng bộ môn: hội đồng
+-- Trưởng ngành: hội đồng
 ('VIEW_ALL_COUNCIL', 'Xem tất cả hội đồng'),
 ('VIEW_ALL_COUNCIL_STUDENT', 'Xem danh sách sinh viên của tất cả hội đồng'),
 ('VIEW_ALL_DEFENSE_PLAN', 'Xem kế hoạch bảo vệ của tất cả hội đồng'),
@@ -82,7 +101,7 @@ INSERT INTO permission (name, description) VALUES
 ('EXPORT_COUNCIL', 'Xuất danh sách hội đồng'),
 ('ASSIGN_STUDENT_TO_COUNCIL', 'Phân công sinh viên vào hội đồng'),
 ('CONFIRM_DEFENSE_RESCHEDULE', 'Xác nhận đổi lịch bảo vệ'),
--- Trưởng bộ môn: thống kê, thông tin xác nhận
+-- Trưởng ngành: thống kê, thông tin xác nhận
 ('VIEW_STAT_PASSED_STUDENT', 'Thống kê sinh viên đỗ đồ án'),
 ('VIEW_STAT_ADVISOR_RATE', 'Thống kê tỷ lệ giáo viên hướng dẫn sinh viên qua đồ án'),
 ('VIEW_DECISION_FILE', 'Xem danh sách thông tin xác nhận (file quyết định)'),
@@ -133,7 +152,7 @@ INSERT INTO role (name, description) VALUES
 ('ADMIN', 'Quản trị viên hệ thống'),
 ('STUDENT', 'Sinh viên làm đồ án'),
 ('LECTURER', 'Giáo viên (role nền, các role giáo viên khác kế thừa)'),
-('HEAD_OF_DEPARTMENT', 'Trưởng bộ môn'),
+('HEAD_OF_MAJOR', 'Trưởng ngành (ngành phụ trách lưu ở major.head_account_id)'),
 ('SUPERVISOR', 'Giáo viên hướng dẫn'),
 ('COMMENTING_LECTURER', 'Giáo viên nhận xét'),
 ('EXAMINER', 'Giáo viên phản biện'),
@@ -159,7 +178,20 @@ INSERT INTO role_permission (role_name, permession_name) VALUES
 ('ADMIN', 'UPDATE_SEMESTER'),
 ('ADMIN', 'VIEW_MAJOR'),
 ('ADMIN', 'CREATE_MAJOR'),
-('ADMIN', 'DELETE_MAJOR');
+('ADMIN', 'UPDATE_MAJOR'),
+('ADMIN', 'DELETE_MAJOR'),
+('ADMIN', 'ASSIGN_HEAD_OF_MAJOR'),
+('ADMIN', 'ACCESS_ALL_MAJORS'),
+('ADMIN', 'VIEW_STUDENT'),
+('ADMIN', 'IMPORT_STUDENT'),
+('ADMIN', 'EXPORT_STUDENT'),
+('ADMIN', 'UPDATE_STUDENT_STATUS'),
+('ADMIN', 'VIEW_TEACHER'),
+('ADMIN', 'IMPORT_TEACHER'),
+('ADMIN', 'EXPORT_TEACHER'),
+('ADMIN', 'UPDATE_TEACHER_STATUS'),
+('ADMIN', 'CONFIG_ADVISOR_QUOTA'),
+('ADMIN', 'ASSIGN_ADVISOR');
 
 -- STUDENT
 INSERT INTO role_permission (role_name, permession_name) VALUES
@@ -176,40 +208,50 @@ INSERT INTO role_permission (role_name, permession_name) VALUES
 
 -- TEACHER: không có permission nào (chỉ cần đăng nhập để xem tài liệu mẫu)
 
--- HEAD_OF_DEPARTMENT
+-- HEAD_OF_MAJOR (Trưởng ngành)
+-- Mọi quyền dưới đây chỉ áp dụng trên ngành mình phụ trách (không có ACCESS_ALL_MAJORS).
+-- Riêng ASSIGN_ADVISOR: scope kiểm tra phía sinh viên, giáo viên được chọn có thể thuộc ngành khác.
+-- Không còn CREATE_ACCOUNT: tạo tài khoản tự do chỉ dành cho Admin.
 INSERT INTO role_permission (role_name, permession_name) VALUES
-('HEAD_OF_DEPARTMENT', 'CREATE_ACCOUNT'),
-('HEAD_OF_DEPARTMENT', 'CREATE_TEMPLATE_DOC'),
-('HEAD_OF_DEPARTMENT', 'UPDATE_TEMPLATE_DOC'),
-('HEAD_OF_DEPARTMENT', 'DELETE_TEMPLATE_DOC'),
-('HEAD_OF_DEPARTMENT', 'VIEW_PROJECT_STUDENT'),
-('HEAD_OF_DEPARTMENT', 'ADD_PROJECT_STUDENT'),
-('HEAD_OF_DEPARTMENT', 'EXPORT_PROJECT_STUDENT'),
-('HEAD_OF_DEPARTMENT', 'VIEW_TEACHER'),
-('HEAD_OF_DEPARTMENT', 'VIEW_SEMESTER_TEACHER'),
-('HEAD_OF_DEPARTMENT', 'ADD_SEMESTER_TEACHER'),
-('HEAD_OF_DEPARTMENT', 'REMOVE_SEMESTER_TEACHER'),
-('HEAD_OF_DEPARTMENT', 'CONFIG_ADVISOR_QUOTA'),
-('HEAD_OF_DEPARTMENT', 'VIEW_SCHEDULE'),
-('HEAD_OF_DEPARTMENT', 'CREATE_SCHEDULE'),
-('HEAD_OF_DEPARTMENT', 'UPDATE_SCHEDULE'),
-('HEAD_OF_DEPARTMENT', 'DELETE_SCHEDULE'),
-('HEAD_OF_DEPARTMENT', 'CONFIG_GRADING_CRITERIA'),
-('HEAD_OF_DEPARTMENT', 'ASSIGN_ADVISOR'),
-('HEAD_OF_DEPARTMENT', 'ASSIGN_OUTLINE_REVIEWER'),
-('HEAD_OF_DEPARTMENT', 'VIEW_ALL_COUNCIL'),
-('HEAD_OF_DEPARTMENT', 'VIEW_ALL_COUNCIL_STUDENT'),
-('HEAD_OF_DEPARTMENT', 'VIEW_ALL_DEFENSE_PLAN'),
-('HEAD_OF_DEPARTMENT', 'CREATE_COUNCIL'),
-('HEAD_OF_DEPARTMENT', 'UPDATE_COUNCIL'),
-('HEAD_OF_DEPARTMENT', 'EXPORT_COUNCIL'),
-('HEAD_OF_DEPARTMENT', 'ASSIGN_STUDENT_TO_COUNCIL'),
-('HEAD_OF_DEPARTMENT', 'CONFIRM_DEFENSE_RESCHEDULE'),
-('HEAD_OF_DEPARTMENT', 'VIEW_STAT_PASSED_STUDENT'),
-('HEAD_OF_DEPARTMENT', 'VIEW_STAT_ADVISOR_RATE'),
-('HEAD_OF_DEPARTMENT', 'VIEW_DECISION_FILE'),
-('HEAD_OF_DEPARTMENT', 'CREATE_DECISION_FOLDER'),
-('HEAD_OF_DEPARTMENT', 'IMPORT_DECISION_FILE');
+('HEAD_OF_MAJOR', 'VIEW_MAJOR'),
+('HEAD_OF_MAJOR', 'VIEW_STUDENT'),
+('HEAD_OF_MAJOR', 'IMPORT_STUDENT'),
+('HEAD_OF_MAJOR', 'EXPORT_STUDENT'),
+('HEAD_OF_MAJOR', 'UPDATE_STUDENT_STATUS'),
+('HEAD_OF_MAJOR', 'IMPORT_TEACHER'),
+('HEAD_OF_MAJOR', 'EXPORT_TEACHER'),
+('HEAD_OF_MAJOR', 'UPDATE_TEACHER_STATUS'),
+('HEAD_OF_MAJOR', 'CREATE_TEMPLATE_DOC'),
+('HEAD_OF_MAJOR', 'UPDATE_TEMPLATE_DOC'),
+('HEAD_OF_MAJOR', 'DELETE_TEMPLATE_DOC'),
+('HEAD_OF_MAJOR', 'VIEW_PROJECT_STUDENT'),
+('HEAD_OF_MAJOR', 'ADD_PROJECT_STUDENT'),
+('HEAD_OF_MAJOR', 'EXPORT_PROJECT_STUDENT'),
+('HEAD_OF_MAJOR', 'VIEW_TEACHER'),
+('HEAD_OF_MAJOR', 'VIEW_SEMESTER_TEACHER'),
+('HEAD_OF_MAJOR', 'ADD_SEMESTER_TEACHER'),
+('HEAD_OF_MAJOR', 'REMOVE_SEMESTER_TEACHER'),
+('HEAD_OF_MAJOR', 'CONFIG_ADVISOR_QUOTA'),
+('HEAD_OF_MAJOR', 'VIEW_SCHEDULE'),
+('HEAD_OF_MAJOR', 'CREATE_SCHEDULE'),
+('HEAD_OF_MAJOR', 'UPDATE_SCHEDULE'),
+('HEAD_OF_MAJOR', 'DELETE_SCHEDULE'),
+('HEAD_OF_MAJOR', 'CONFIG_GRADING_CRITERIA'),
+('HEAD_OF_MAJOR', 'ASSIGN_ADVISOR'),
+('HEAD_OF_MAJOR', 'ASSIGN_OUTLINE_REVIEWER'),
+('HEAD_OF_MAJOR', 'VIEW_ALL_COUNCIL'),
+('HEAD_OF_MAJOR', 'VIEW_ALL_COUNCIL_STUDENT'),
+('HEAD_OF_MAJOR', 'VIEW_ALL_DEFENSE_PLAN'),
+('HEAD_OF_MAJOR', 'CREATE_COUNCIL'),
+('HEAD_OF_MAJOR', 'UPDATE_COUNCIL'),
+('HEAD_OF_MAJOR', 'EXPORT_COUNCIL'),
+('HEAD_OF_MAJOR', 'ASSIGN_STUDENT_TO_COUNCIL'),
+('HEAD_OF_MAJOR', 'CONFIRM_DEFENSE_RESCHEDULE'),
+('HEAD_OF_MAJOR', 'VIEW_STAT_PASSED_STUDENT'),
+('HEAD_OF_MAJOR', 'VIEW_STAT_ADVISOR_RATE'),
+('HEAD_OF_MAJOR', 'VIEW_DECISION_FILE'),
+('HEAD_OF_MAJOR', 'CREATE_DECISION_FOLDER'),
+('HEAD_OF_MAJOR', 'IMPORT_DECISION_FILE');
 
 -- ADVISOR (Giáo viên hướng dẫn)
 INSERT INTO role_permission (role_name, permession_name) VALUES
@@ -264,3 +306,118 @@ INSERT INTO role_permission (role_name, permession_name) VALUES
 ('COUNCIL_MEMBER', 'VIEW_ASSIGNED_COUNCIL_STUDENT'),
 ('COUNCIL_MEMBER', 'VIEW_ASSIGNED_DEFENSE_PLAN'),
 ('COUNCIL_MEMBER', 'GRADE_COUNCIL');
+
+
+-- =====================================================================
+-- 4. MIGRATION cho DB ĐANG CHẠY (đã seed theo bản cũ có HEAD_OF_DEPARTMENT)
+-- ddl-auto=update chỉ THÊM cột major.head_account_id, không xóa cột/role cũ,
+-- nên phải chạy tay các bước dưới SAU KHI khởi động app bản mới 1 lần.
+-- DB mới tinh thì bỏ qua mục này, chỉ chạy mục 1–3.
+-- =====================================================================
+START TRANSACTION;
+
+-- 4.1 Permission mới
+INSERT IGNORE INTO permission (name, description) VALUES
+('UPDATE_MAJOR', 'Sửa ngành'),
+('ASSIGN_HEAD_OF_MAJOR', 'Gán/thu hồi trưởng ngành cho ngành'),
+('ACCESS_ALL_MAJORS', 'Thao tác dữ liệu sinh viên, giáo viên của tất cả các ngành'),
+('VIEW_STUDENT', 'Xem danh sách, chi tiết sinh viên'),
+('IMPORT_STUDENT', 'Import Excel / thêm thủ công sinh viên'),
+('EXPORT_STUDENT', 'Xuất danh sách sinh viên'),
+('UPDATE_STUDENT_STATUS', 'Kích hoạt lại / vô hiệu hóa sinh viên'),
+('IMPORT_TEACHER', 'Import Excel / thêm thủ công giáo viên (trong và ngoài trường)'),
+('EXPORT_TEACHER', 'Xuất danh sách giáo viên'),
+('UPDATE_TEACHER_STATUS', 'Kích hoạt lại / vô hiệu hóa giáo viên');
+
+-- 4.2 Role mới
+INSERT IGNORE INTO role (name, description) VALUES
+('HEAD_OF_MAJOR', 'Trưởng ngành (ngành phụ trách lưu ở major.head_account_id)');
+
+-- 4.3 Quyền của HEAD_OF_MAJOR = quyền cũ của HEAD_OF_DEPARTMENT (trừ CREATE_ACCOUNT) + quyền mới
+INSERT IGNORE INTO role_permission (role_name, permession_name)
+SELECT 'HEAD_OF_MAJOR', permession_name
+FROM role_permission
+WHERE role_name = 'HEAD_OF_DEPARTMENT' AND permession_name <> 'CREATE_ACCOUNT';
+
+INSERT IGNORE INTO role_permission (role_name, permession_name) VALUES
+('HEAD_OF_MAJOR', 'VIEW_MAJOR'),
+('HEAD_OF_MAJOR', 'VIEW_STUDENT'),
+('HEAD_OF_MAJOR', 'IMPORT_STUDENT'),
+('HEAD_OF_MAJOR', 'EXPORT_STUDENT'),
+('HEAD_OF_MAJOR', 'UPDATE_STUDENT_STATUS'),
+('HEAD_OF_MAJOR', 'IMPORT_TEACHER'),
+('HEAD_OF_MAJOR', 'EXPORT_TEACHER'),
+('HEAD_OF_MAJOR', 'UPDATE_TEACHER_STATUS'),
+-- Code dùng hasAuthority cho các quyền dưới; INSERT IGNORE để không phụ thuộc seed cũ đã có hay chưa
+('HEAD_OF_MAJOR', 'VIEW_TEACHER'),
+('HEAD_OF_MAJOR', 'CONFIG_ADVISOR_QUOTA'),
+('ADMIN', 'VIEW_MAJOR'),
+('ADMIN', 'DELETE_MAJOR'),
+('ADMIN', 'UPDATE_MAJOR'),
+('ADMIN', 'ASSIGN_HEAD_OF_MAJOR'),
+('ADMIN', 'ACCESS_ALL_MAJORS'),
+('ADMIN', 'VIEW_STUDENT'),
+('ADMIN', 'IMPORT_STUDENT'),
+('ADMIN', 'EXPORT_STUDENT'),
+('ADMIN', 'UPDATE_STUDENT_STATUS'),
+('ADMIN', 'VIEW_TEACHER'),
+('ADMIN', 'IMPORT_TEACHER'),
+('ADMIN', 'EXPORT_TEACHER'),
+('ADMIN', 'UPDATE_TEACHER_STATUS'),
+('ADMIN', 'CONFIG_ADVISOR_QUOTA'),
+('ADMIN', 'ASSIGN_ADVISOR');
+
+COMMIT;
+
+
+-- =====================================================================
+-- 5. SEED TRƯỞNG NGÀNH (dữ liệu giả để test)
+-- Chạy sau khi đã có major (đầu file) và role (mục 2).
+-- Mỗi ngành 1 giáo viên trong trường: first_name = 'Nguyễn', last_name = tên ngành.
+-- Email, SĐT là dữ liệu giả, đổi lại trong 5.1 trước khi test. Teacher và
+-- head_account_id ghép theo last_name = major.name nên đổi email không ảnh hưởng 5.2–5.4.
+-- =====================================================================
+START TRANSACTION;
+
+-- 5.1 Account (status = 1: đang hoạt động)
+INSERT INTO account (email, first_name, last_name, phone, status) VALUES
+('truongnganh.ktpm@tlu.edu.vn', 'Nguyễn', 'Kỹ thuật phần mềm', '0399990001', 1),
+('truongnganh.httt@tlu.edu.vn', 'Nguyễn', 'Hệ thống thông tin', '0399990002', 1),
+('truongnganh.cntt@tlu.edu.vn', 'Nguyễn', 'Công nghệ thông tin', '0399990003', 1),
+('truongnganh.anm@tlu.edu.vn', 'Nguyễn', 'An ninh mạng', '0399990004', 1),
+('truongnganh.ai@tlu.edu.vn', 'Nguyễn', 'Trí tuệ nhân tạo và Khoa học dữ liệu', '0399990005', 1);
+
+-- 5.2 Teacher: giáo viên trong trường thuộc đúng ngành mình làm trưởng, số lượng hướng dẫn mặc định 20
+INSERT INTO teacher (public_id, organization, amount, major_id, account_id)
+SELECT UUID_TO_BIN(UUID()), 'Trường Đại học Thủy lợi', 20, m.id, a.id
+FROM major m
+JOIN account a ON a.first_name = 'Nguyễn' AND a.last_name = m.name
+WHERE m.code IN ('KTPM01', 'HTTT01', 'CNTT01', 'ANM01', 'AI01');
+
+-- 5.3 Role: SUPERVISOR (như giáo viên import) + HEAD_OF_MAJOR
+INSERT INTO user_role (user_id, role_name)
+SELECT a.id, r.role_name
+FROM major m
+JOIN account a ON a.first_name = 'Nguyễn' AND a.last_name = m.name
+CROSS JOIN (SELECT 'SUPERVISOR' AS role_name UNION ALL SELECT 'HEAD_OF_MAJOR') r
+WHERE m.code IN ('KTPM01', 'HTTT01', 'CNTT01', 'ANM01', 'AI01');
+
+-- 5.4 Gán trưởng ngành cho từng ngành
+-- MySQL Workbench bật safe update mode (lỗi 1175 vì WHERE không lọc theo cột key),
+-- nên tắt tạm trong phiên này rồi bật lại
+SET SQL_SAFE_UPDATES = 0;
+UPDATE major m
+JOIN account a ON a.first_name = 'Nguyễn' AND a.last_name = m.name
+SET m.head_account_id = a.id
+WHERE m.code IN ('KTPM01', 'HTTT01', 'CNTT01', 'ANM01', 'AI01');
+SET SQL_SAFE_UPDATES = 1;
+
+COMMIT;
+
+-- Kiểm tra: mỗi ngành phải có đúng 1 dòng, roles = HEAD_OF_MAJOR,SUPERVISOR
+-- SELECT m.code, a.email, CONCAT(a.first_name, ' ', a.last_name) AS full_name,
+--        GROUP_CONCAT(ur.role_name ORDER BY ur.role_name) AS roles
+-- FROM major m
+-- JOIN account a ON a.id = m.head_account_id
+-- JOIN user_role ur ON ur.user_id = a.id
+-- GROUP BY m.code, a.email, a.first_name, a.last_name;

@@ -31,7 +31,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     // Lấy các kết nối mà User chưa đọc
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getNotification(Boolean isRead) {
         Account account = authenticationService.getAccountInfo();
         List<Notification> notification = notificationRepository.findNotifications(account.getId(), isRead);
@@ -69,7 +69,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void pushNotification(String message, Account recipient) {
         // Người nhận: recipient
         Notification notification = new Notification();
@@ -96,7 +96,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void readNotification() {
         Account account = authenticationService.getAccountInfo();
         // Update toàn bộ thông báo chưa đọc theo AccountId

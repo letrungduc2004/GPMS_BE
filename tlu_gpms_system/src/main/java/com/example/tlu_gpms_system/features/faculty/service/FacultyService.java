@@ -6,17 +6,12 @@ import com.example.tlu_gpms_system.features.faculty.dto.request.FacultyUpdateReq
 import com.example.tlu_gpms_system.features.faculty.dto.request.MajorCreationRequest;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyDetailResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyResponse;
-import com.example.tlu_gpms_system.features.faculty.dto.response.HeadCandidateResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.MajorResponse;
 import org.springframework.data.domain.Pageable;
-
-import java.util.List;
 
 public interface FacultyService {
 
     PageResponse<FacultyResponse> getAll(String keyword, String status, Pageable pageable);
-
-    List<HeadCandidateResponse> getHeadCandidates();
 
     FacultyDetailResponse getById(String id);
 

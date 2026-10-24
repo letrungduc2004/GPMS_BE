@@ -7,7 +7,6 @@ import com.example.tlu_gpms_system.features.faculty.dto.request.FacultyUpdateReq
 import com.example.tlu_gpms_system.features.faculty.dto.request.MajorCreationRequest;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyDetailResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.FacultyResponse;
-import com.example.tlu_gpms_system.features.faculty.dto.response.HeadCandidateResponse;
 import com.example.tlu_gpms_system.features.faculty.dto.response.MajorResponse;
 import com.example.tlu_gpms_system.features.faculty.service.FacultyService;
 import jakarta.validation.Valid;
@@ -18,16 +17,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping({"/api/v1/faculties", "/api/v1/faculty", "/faculties", "/faculty"})
 @RequiredArgsConstructor
 public class FacultyController {
 
     private final FacultyService facultyService;
 
-    @GetMapping
+    @GetMapping({"/api/v1/faculties", "/api/v1/faculty", "/faculties", "/faculty"})
     public APIResponse<PageResponse<FacultyResponse>> getAll(
             @RequestParam(name = "keyword", required = false) String keyword,
             @RequestParam(name = "status", required = false) String status,
@@ -39,7 +35,6 @@ public class FacultyController {
         String validSortBy = switch (sortBy) {
             case "code" -> "code";
             case "name" -> "name";
-            case "headOfDepartment" -> "headOfDepartment.lastName";
             case "status" -> "status";
             case "id" -> "id";
             default -> "createdAt";
@@ -53,15 +48,7 @@ public class FacultyController {
                 .build();
     }
 
-    @GetMapping("/head-candidates")
-    public APIResponse<List<HeadCandidateResponse>> getHeadCandidates() {
-        return APIResponse.<List<HeadCandidateResponse>>builder()
-                .code(1000)
-                .data(facultyService.getHeadCandidates())
-                .build();
-    }
-
-    @GetMapping("/{id}")
+    @GetMapping({"/api/v1/faculties/{id}", "/api/v1/faculty/{id}", "/faculties/{id}", "/faculty/{id}"})
     public APIResponse<FacultyDetailResponse> getById(@PathVariable("id") String id) {
         return APIResponse.<FacultyDetailResponse>builder()
                 .code(1000)
@@ -69,7 +56,7 @@ public class FacultyController {
                 .build();
     }
 
-    @PostMapping
+    @PostMapping({"/api/v1/faculties", "/api/v1/faculty", "/faculties", "/faculty"})
     public APIResponse<Void> create(@RequestBody @Valid FacultyCreationRequest request) {
         facultyService.create(request);
         return APIResponse.<Void>builder()
@@ -78,7 +65,7 @@ public class FacultyController {
                 .build();
     }
 
-    @PutMapping("/{id}")
+    @PutMapping({"/api/v1/faculties/{id}", "/api/v1/faculty/{id}", "/faculties/{id}", "/faculty/{id}"})
     public APIResponse<Void> update(
             @PathVariable("id") String id,
             @RequestBody @Valid FacultyUpdateRequest request
@@ -90,7 +77,7 @@ public class FacultyController {
                 .build();
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping({"/api/v1/faculties/{id}", "/api/v1/faculty/{id}", "/faculties/{id}", "/faculty/{id}"})
     public APIResponse<Void> delete(@PathVariable("id") String id) {
         facultyService.delete(id);
         return APIResponse.<Void>builder()
@@ -99,7 +86,7 @@ public class FacultyController {
                 .build();
     }
 
-    @GetMapping("/{id}/majors")
+    @GetMapping({"/api/v1/faculties/{id}/majors", "/api/v1/faculty/{id}/majors", "/faculties/{id}/majors", "/faculty/{id}/majors"})
     public APIResponse<PageResponse<MajorResponse>> getMajors(
             @PathVariable("id") String id,
             @RequestParam(name = "keyword", required = false) String keyword,
@@ -124,7 +111,7 @@ public class FacultyController {
                 .build();
     }
 
-    @PostMapping("/{id}/majors")
+    @PostMapping({"/api/v1/faculties/{id}/majors", "/api/v1/faculty/{id}/majors", "/faculties/{id}/majors", "/faculty/{id}/majors"})
     public APIResponse<Void> addMajor(
             @PathVariable("id") String id,
             @RequestBody @Valid MajorCreationRequest request

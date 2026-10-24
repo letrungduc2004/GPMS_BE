@@ -9,8 +9,6 @@ import com.example.tlu_gpms_system.features.account.dto.response.IntrospectRespo
 import com.example.tlu_gpms_system.features.account.dto.response.LoginPostManResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.LoginResponse;
 import com.example.tlu_gpms_system.features.account.dto.response.UserInfoResponse;
-import com.example.tlu_gpms_system.features.account.entity.Account;
-import com.example.tlu_gpms_system.features.account.repository.AccountRepository;
 import com.example.tlu_gpms_system.features.account.service.AuthenticationService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -19,20 +17,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import com.example.tlu_gpms_system.features.account.entity.Role;
 import java.time.Duration;
-import java.util.Collections;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticationController {
-    private final AccountRepository accountRepository;
     private final AuthenticationService authenticationService;
 
     @Value("${jwt.time-expiration}")
@@ -122,7 +114,6 @@ public class AuthenticationController {
     }
 
     @GetMapping("/my-info")
-    @Transactional(readOnly = true)
     public APIResponse<UserInfoResponse> getInfo() {
         return APIResponse.<UserInfoResponse>builder()
                 .code(1000)
@@ -132,36 +123,12 @@ public class AuthenticationController {
     }
 
     @PostMapping("/login-postman")
-    @Transactional
     public APIResponse<LoginPostManResponse> loginPostMan(@RequestBody String email,
             HttpServletResponse servletResponse) {
-        Account account = accountRepository.findByEmailAndStatus(email)
-                .orElseThrow(() -> new AppException(ErrorCode.ACCOUNT_INVALID));
-        String createToken = authenticationService.createToken(account);
-
-        Set<String> roles = account.getRoles() != null
-                ? account.getRoles().stream()
-                        .map(Role::getName)
-                        .collect(Collectors.toSet())
-                : Collections.emptySet();
-        StringBuilder builder = new StringBuilder();
-        if (account.getFirstName() != null) {
-            builder.append(account.getFirstName()).append(" ");
-        }
-        if (account.getLastName() != null) {
-            builder.append(account.getLastName());
-        }
-        LoginPostManResponse response = LoginPostManResponse.builder()
-                .token(createToken)
-                .authenticated(true)
-                .name(builder.toString().trim())
-                .role(roles)
-                .build();
-
         return APIResponse.<LoginPostManResponse>builder()
                 .code(1000)
                 .message("Đăng nhập thành công")
-                .data(response)
+                .data(authenticationService.loginPostMan(email))
                 .build();
     }
 

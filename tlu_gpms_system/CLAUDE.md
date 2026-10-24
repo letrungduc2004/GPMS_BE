@@ -144,7 +144,8 @@ Trước khi viết hàm tiện ích mới, kiểm tra `common/` đã có chưa:
 - LUÔN tạo interface trước, rồi implementation trong `impl/`
 - Inject dependency bằng `@RequiredArgsConstructor` (constructor injection)
 - **Transaction**:
-  + Method đọc dữ liệu (get/list/search): `@Transactional(readOnly = true)`. Đặt ở **cấp class** ServiceImpl để mọi method đọc tự áp dụng.
+  + `@Transactional` (mọi biến thể) CHỈ đặt ở **cấp method**, TUYỆT ĐỐI KHÔNG đặt ở cấp class.
+  + Method đọc dữ liệu (get/list/search): BẮT BUỘC `@Transactional(readOnly = true)` trên từng method.
   + Mọi method thay đổi dữ liệu (create/update/delete/import/activate...): BẮT BUỘC `@Transactional(rollbackFor = Exception.class)` trên từng method.
   + KHÔNG dùng `@Transactional` trơn cho method ghi: mặc định Spring chỉ rollback với `RuntimeException`/`Error`, checked exception (ví dụ `IOException` khi đọc file) sẽ vẫn commit phần dữ liệu đã ghi.
 - Throw exception bằng `throw new AppException(ErrorCode.XXX)`
@@ -167,6 +168,7 @@ Trước khi viết hàm tiện ích mới, kiểm tra `common/` đã có chưa:
 
 ## Convention Controller
 - Dùng `@RestController` + `@RequiredArgsConstructor`
+- TUYỆT ĐỐI KHÔNG dùng `@RequestMapping` trên Controller (cả cấp class lẫn method). Mỗi endpoint ghi đầy đủ đường dẫn trong annotation HTTP method: `@GetMapping("/topic")`, `@GetMapping("/topic/{publicId}")`, `@PostMapping("/topic")`, `@PutMapping("/topic/{publicId}")`, `@PatchMapping(...)`, `@DeleteMapping("/topic/{publicId}")`
 - Return type LUÔN là `APIResponse<T>` (wrapper chung)
 - KHÔNG đặt `@PreAuthorize`/`@PostAuthorize`, KHÔNG viết logic nghiệp vụ ở Controller
 - Phân trang: `@PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable`

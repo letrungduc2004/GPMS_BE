@@ -27,7 +27,7 @@ public class ApplicationInitConfig implements ApplicationRunner {
                     .status(true)
                     .firstName("Ad")
                     .lastName("min")
-                    .phone("0367123456")
+                    .phone("031234567")
                     .roles(new HashSet<>(role))
                     .build();
             accountRepository.save(user);

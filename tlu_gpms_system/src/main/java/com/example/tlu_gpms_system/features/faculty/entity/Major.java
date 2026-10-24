@@ -1,6 +1,7 @@
 package com.example.tlu_gpms_system.features.faculty.entity;
 
 import com.example.tlu_gpms_system.common.enums.ActiveStatus;
+import com.example.tlu_gpms_system.features.account.entity.Account;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
@@ -47,6 +48,11 @@ public class Major {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "faculty_id")
     Faculty faculty;
+
+    // Trưởng ngành; null khi ngành chưa có trưởng. unique: mỗi tài khoản làm trưởng tối đa 1 ngành
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "head_account_id", unique = true)
+    Account head;
 
     @Column(name = "created_at")
     LocalDateTime createdAt;

@@ -1,8 +1,9 @@
 # Bộ file test import sinh viên (`POST /student/import`)
 
-- Mã SV dùng dải `2251180001`–`2251180060`. Mặc định email = `mã SV + @gmail.com`, SĐT = `09` + 8 số cuối của mã SV (VD: `2251180001` → `0951180001`).
+- Mã SV dùng dải `2251180001`–`2251180066`. Mặc định email = `mã SV + @gmail.com`, SĐT = `09` + 8 số cuối của mã SV (VD: `2251180001` → `0951180001`).
 - Ngành dùng 5 ngành trong `tlu_gpms_system/db_update/DATA_ROLE_PERMISSION.txt`.
 - Import **theo đúng thứ tự file**. S07 cần dữ liệu của S01, S08 cần trạng thái sau S07 và chạy thêm SQL trước khi import.
+- Phạm vi ngành: Admin import được mọi ngành. Trưởng ngành chỉ import được sinh viên thuộc ngành mình quản lý (xem S15). Ô Ngành nhận tên ngành (không phân biệt hoa/thường) hoặc mã ngành (VD `KTPM01`).
 - `T05` (giáo viên) dùng email/SĐT của sinh viên trong S01, nên phải import S01 trước T05.
 - Dòng lỗi không làm hỏng cả file: các dòng hợp lệ vẫn được lưu (HTTP 200). Chỉ lỗi toàn file mới trả HTTP 400 và không lưu dòng nào.
 - Thông báo trùng tài khoản luôn có dạng `<các trường bị trùng> trùng với tài khoản đã tồn tại trong hệ thống` (code `3014`), các trường xếp theo thứ tự `Mã sinh viên, Email, Số điện thoại`.
@@ -94,6 +95,25 @@ WHERE s.student_code IN ('2251180001', '2251180002', '2251180003', '2251180014')
 | SI51 | 4 | 0003 | Đổi lớp `64CNTT3` → `64CNTT1`, giữ SĐT `0988180003` | Đã kích hoạt lại và cập nhật: Lớp |
 | SI52 | 5 | 0014 | Đổi SĐT sang `0951180015` (của SV 0015) | Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống. SV 0014 vẫn ở trạng thái tắt |
 
+## Phạm vi ngành: `S15_pham_vi_nganh_truong_nganh.xlsx` (Trưởng ngành Kỹ thuật phần mềm import)
+
+Chuẩn bị: Admin import S01 (sinh viên) và T01 (giáo viên), rồi gán gv.test01 làm Trưởng ngành KTPM theo mục "Phạm vi ngành" trong README của `teacher_import`. Import S15 bằng token mới của gv.test01.
+
+| ID | Dòng | Mã SV | Dữ liệu test | Kết quả mong đợi |
+| :--- | :--- | :--- | :--- | :--- |
+| SI58 | 2 | 0061 | Ngành `Kỹ thuật phần mềm` | Thêm sinh viên thành công |
+| SI59 | 3 | 0062 | Ngành `Hệ thống thông tin` | Bạn không có quyền thao tác trên ngành này. Không lưu |
+| SI60 | 4 | 0063 | Ngành ghi bằng mã `KTPM01` | Thêm sinh viên thành công, lưu ngành Kỹ thuật phần mềm |
+| SI61 | 5 | 0064 | Ngành ghi bằng mã `HTTT01` | Bạn không có quyền thao tác trên ngành này. Không lưu |
+| SI62 | 6 | 0065 | Ngành `Khoa học máy tính` (không có trong hệ thống) | Ngành học không tồn tại trong hệ thống (lỗi ngành không tồn tại được báo trước lỗi phạm vi) |
+| SI63 | 7 | 0066 | SĐT `12345` + ngành `Công nghệ thông tin` (2 lỗi) | Số điện thoại và Ngành không hợp lệ, vui lòng kiểm tra lại |
+| SI64 | 8 | 0006 | Y hệt S01 (ngành Kỹ thuật phần mềm) | Cảnh báo `1101`: Sinh viên đã có trong hệ thống, thông tin không thay đổi |
+| SI65 | 9 | 0002 | Dữ liệu của SV 0002 (ngành thật là Hệ thống thông tin) nhưng ghi ngành `Kỹ thuật phần mềm` | Mã sinh viên, Email, Số điện thoại trùng với tài khoản đã tồn tại trong hệ thống. DB không đổi ngành |
+| SI66 | 10 | 0007 | Y hệt S01 (ngành Hệ thống thông tin) | Bạn không có quyền thao tác trên ngành này. DB không đổi |
+| SI67 | — | — | Chạy `UPDATE major SET head_account_id = NULL WHERE code = 'KTPM01';`, giữ nguyên token của gv.test01 rồi import lại S15 | HTTP 403, code `3018`: Bạn không có quyền thao tác trên ngành này. Không lưu dòng nào |
+
+> Muốn chạy lại SI58–SI66, xóa sinh viên 0061 và 0063 (hoặc chạy lại từ đầu) và gán lại Trưởng ngành.
+
 ## Lỗi toàn file (HTTP 400, code 4000, không lưu dòng nào)
 
 | ID | File | Nội dung | Message |
@@ -104,4 +124,4 @@ WHERE s.student_code IN ('2251180001', '2251180002', '2251180003', '2251180014')
 | SI56 | `S12_file_gia_xlsx.xlsx` | File text đổi đuôi thành `.xlsx` | File import phải có định dạng .xlsx |
 | SI57 | `S14_file_rong_0_byte.xlsx` | File 0 byte | File import không được để trống |
 
-> Đã đọc lại các file bằng `StudentExcelReader` + `StudentRowValidator` của BE, kèm bước kiểm tra trùng trong file giống service. Kết quả định dạng, trùng trong file và lỗi toàn file khớp bảng trên. Đối chiếu DB (S07, S08) được suy ra từ `UserServiceImpl` nên cần chạy API thật để xác nhận.
+> Đã đọc lại các file bằng `StudentExcelReader` + `StudentRowValidator` của BE, kèm bước kiểm tra trùng trong file giống service. Kết quả định dạng, trùng trong file và lỗi toàn file khớp bảng trên. Đối chiếu DB (S07, S08) và phạm vi ngành (S15) được suy ra từ `UserServiceImpl` nên cần chạy API thật để xác nhận.

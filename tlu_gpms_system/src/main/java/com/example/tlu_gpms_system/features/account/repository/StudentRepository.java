@@ -22,6 +22,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     // Tham số rỗng đã được Service đổi về null; null nghĩa là không lọc theo điều kiện đó.
     // keyword tìm theo mã SV, họ tên đầy đủ (Họ + Tên) hoặc email.
     // active: true = đang hoạt động (cả Account và Student đều bật), false = đã tắt.
+    // allMajors = true (Admin): không lọc ngành; false: chỉ lấy sinh viên thuộc majorIds (phạm vi Trưởng ngành).
     String STUDENT_LIST_FILTER = """
             FROM Student s
             JOIN s.account a
@@ -33,6 +34,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
               AND (:batch IS NULL OR s.batch = :batch)
               AND (:majorId IS NULL OR m.publicId = :majorId)
               AND (:active IS NULL OR (CASE WHEN a.status = true AND s.status = true THEN true ELSE false END) = :active)
+              AND (:allMajors = true OR m.id IN :majorIds)
             """;
 
     Optional<Student> findByPublicId(UUID publicId);
@@ -60,6 +62,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             @Param("batch") String batch,
             @Param("majorId") UUID majorId,
             @Param("active") Boolean active,
+            @Param("allMajors") boolean allMajors,
+            @Param("majorIds") Collection<Long> majorIds,
             Pageable pageable
     );
 
@@ -79,8 +83,11 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             JOIN s.account a
             LEFT JOIN s.major m
             WHERE s.publicId = :publicId
+              AND (:allMajors = true OR m.id IN :majorIds)
             """)
-    Optional<StudentDetailResponse> findStudentDetail(@Param("publicId") UUID publicId);
+    Optional<StudentDetailResponse> findStudentDetail(@Param("publicId") UUID publicId,
+                                                      @Param("allMajors") boolean allMajors,
+                                                      @Param("majorIds") Collection<Long> majorIds);
 
 
     //------------------------------------------Dương------------------------------------

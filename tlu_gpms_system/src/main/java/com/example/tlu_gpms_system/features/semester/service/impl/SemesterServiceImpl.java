@@ -25,7 +25,6 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class SemesterServiceImpl implements SemesterService {
 
     private final SemesterRepository semesterRepository;
@@ -34,6 +33,7 @@ public class SemesterServiceImpl implements SemesterService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
     public PageResponse<SemesterResponse> getAll(String keyword, String status, Pageable pageable) {
         SemesterStatus statusEnum = null;
         if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
@@ -46,6 +46,7 @@ public class SemesterServiceImpl implements SemesterService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
     public SemesterResponse getByPublicId(UUID publicId) {
         Semester semester = semesterRepository.findByPublicId(publicId)
                 .orElseThrow(() -> new AppException(ErrorCode.SEMESTER_NOT_FOUND));
@@ -53,7 +54,7 @@ public class SemesterServiceImpl implements SemesterService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void create(SemesterRequest request) {
         // Ràng buộc: Ngày bắt đầu phải đứng trước ngày kết thúc
@@ -81,7 +82,7 @@ public class SemesterServiceImpl implements SemesterService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void update(UUID publicId, SemesterRequest request) {
         Semester entity = semesterRepository.findByPublicId(publicId)
@@ -112,7 +113,7 @@ public class SemesterServiceImpl implements SemesterService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PreAuthorize("hasRole('ADMIN')")
     public void delete(UUID publicId) {
         Semester entity = semesterRepository.findByPublicId(publicId)

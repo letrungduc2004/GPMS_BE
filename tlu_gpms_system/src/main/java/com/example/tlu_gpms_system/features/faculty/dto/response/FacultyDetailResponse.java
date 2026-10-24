@@ -16,7 +16,6 @@ public class FacultyDetailResponse {
     UUID publicId;
     String code;
     String name;
-    HeadOfDepartmentResponse headOfDepartment;
     String description;
     String status;
     ActiveStatus statusCode;

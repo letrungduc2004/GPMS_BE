@@ -144,7 +144,7 @@ public interface <EntityName>Mapping {
 - Interface: `features/<feature_name>/service/<EntityName>Service.java`
 - Implementation: `features/<feature_name>/service/impl/<EntityName>ServiceImpl.java`
 - Template chi tiết: xem skill `api-crud-pattern`
-- `@Service`, `@RequiredArgsConstructor`, `@Transactional(readOnly = true)` ở **cấp class**, `@Transactional(rollbackFor = Exception.class)` trên từng method thay đổi dữ liệu
+- `@Service`, `@RequiredArgsConstructor`, `@Transactional(readOnly = true)` trên từng method đọc, `@Transactional(rollbackFor = Exception.class)` trên từng method thay đổi dữ liệu; TUYỆT ĐỐI KHÔNG đặt `@Transactional` ở cấp class
 - Chỉ inject Repository của chính feature. Cần dữ liệu/nghiệp vụ của feature khác → inject `Service` interface của feature đó; KHÔNG inject Repository hay `save`/`delete` Entity của feature khác
 - **Phân quyền đặt ở đây** (KHÔNG ở Controller): `@PreAuthorize("hasRole('<ROLE>')")` / `hasAnyRole(...)` / `hasAuthority('<PERMISSION>')`, và `@PostAuthorize` khi cần kiểm tra trên đối tượng trả về. `<ROLE>` đúng tên trong `Role.java`, không có tiền tố `ROLE_`
 - Lấy user hiện tại: inject `AuthenticationService`, gọi `getAccountInfo()`
@@ -157,6 +157,7 @@ public interface <EntityName>Mapping {
 - Đường dẫn: `features/<feature_name>/controller/<EntityName>Controller.java`
 - Return luôn là `APIResponse<T>`; endpoint danh từ số ít (`/topic`)
 - KHÔNG đặt `@PreAuthorize`/`@PostAuthorize`, KHÔNG viết logic nghiệp vụ
+- TUYỆT ĐỐI KHÔNG dùng `@RequestMapping`; ghi đủ đường dẫn trong từng annotation HTTP method: `@GetMapping("/topic")`, `@PostMapping("/topic")`, `@PutMapping("/topic/{publicId}")`, `@DeleteMapping("/topic/{publicId}")`...
 - Danh sách: `@PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable`
 
 ### Bước 7: Cập nhật ErrorCode và Permission
@@ -178,10 +179,10 @@ public interface <EntityName>Mapping {
 - [ ] DTO Request/Response KHÔNG expose `id` (Long)
 - [ ] DTO khai báo đủ `@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder @FieldDefaults(level = AccessLevel.PRIVATE)`
 - [ ] Mapper dùng `@Mapper(componentModel = "spring")`, ignore `id` và `publicId` khi map từ Request
-- [ ] Service có interface + impl, constructor injection, `@Transactional(readOnly = true)` ở class, `@Transactional(rollbackFor = Exception.class)` trên method ghi
+- [ ] Service có interface + impl, constructor injection, `@Transactional(readOnly = true)` trên từng method đọc, `@Transactional(rollbackFor = Exception.class)` trên từng method ghi, KHÔNG có `@Transactional` ở cấp class
 - [ ] Không inject Repository của feature khác; `@Query` JOIN chéo feature chỉ dùng để đọc (DTO Projection)
 - [ ] ServiceImpl có `@PreAuthorize` / `@PostAuthorize` trên từng method public, role đúng tên trong `Role.java`
-- [ ] Controller trả `APIResponse<T>` và KHÔNG có annotation phân quyền
+- [ ] Controller trả `APIResponse<T>` và KHÔNG có annotation phân quyền, KHÔNG có `@RequestMapping` (đường dẫn đầy đủ nằm trong `@GetMapping`/`@PostMapping`...)
 - [ ] ErrorCode được cập nhật nếu có lỗi mới; permission mới đã có trong `DATA_ROLE_PERMISSION.txt`
 - [ ] Comment tiếng Việt cho logic quan trọng
 - [ ] `.\mvnw.cmd clean compile` và `.\mvnw.cmd test -Dtest=<EntityName>ServiceImplTest` chạy qua

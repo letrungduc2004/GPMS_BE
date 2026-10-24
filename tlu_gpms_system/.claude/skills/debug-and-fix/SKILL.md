@@ -45,7 +45,7 @@ description: >-
 
 ### 2. Lỗi Hibernate / JPA
 - **LazyInitializationException**:
-  - Cách 1: Đảm bảo method service chạy trong transaction (`@Transactional(readOnly = true)` ở class ServiceImpl)
+  - Cách 1: Đảm bảo method service chạy trong transaction (`@Transactional(readOnly = true)` trên chính method đọc đó, KHÔNG đặt ở cấp class)
   - Cách 2: Dùng `@Query("SELECT e FROM Entity e JOIN FETCH e.relation WHERE ...")`
   - Cách 3: Dùng DTO Projection, không trả entity ra ngoài service
   - KHÔNG bật `spring.jpa.open-in-view=true` (đã tắt trong dự án)

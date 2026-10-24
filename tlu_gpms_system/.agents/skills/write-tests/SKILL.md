@@ -45,14 +45,13 @@ Toàn bộ quy ước (thiết kế case Normal/Abnormal/Boundary, mã UTC, anno
 ### Lưu ý trước khi viết
 - `@SpringBootTest` khởi động toàn bộ context → **cần MySQL đang chạy** với cấu hình trong `application.properties`. Báo user nếu không chạy được.
 - Dự án **chưa có** `spring-security-test` trong `pom.xml` → **không dùng được** `@WithMockUser` / `jwt()`. Mặc định dùng Cách 1.
-- Test có ghi dữ liệu → thêm `@Transactional` ở class/method để rollback sau mỗi test.
+- Test cần rollback dữ liệu → thêm `@Transactional` trên **từng method test** (TUYỆT ĐỐI KHÔNG đặt `@Transactional` ở cấp class).
 - KHÔNG hard-code email/mật khẩu thật trong test mới; lấy tài khoản test qua repository theo role hoặc tạo dữ liệu test trong `@BeforeEach`.
 
 ### Cách 1 (mặc định): Token thật + cookie `access_token`
 ```java
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 class <Entity>ControllerIntegrationTest {
 
     @Autowired
@@ -74,6 +73,7 @@ class <Entity>ControllerIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("Trả về 200 khi có quyền lấy danh sách")
     void getAll_success() throws Exception {
         Account headOfDepartment = /* account test có role HEAD_OF_DEPARTMENT */;
@@ -85,6 +85,7 @@ class <Entity>ControllerIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("Trả về 403 khi không có quyền")
     void getAll_forbidden_return403() throws Exception {
         Account student = /* account test có role STUDENT */;
@@ -95,6 +96,7 @@ class <Entity>ControllerIntegrationTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("Trả về 401 khi chưa đăng nhập")
     void getAll_noToken_return401() throws Exception {
         mockMvc.perform(get("/<endpoint>"))
